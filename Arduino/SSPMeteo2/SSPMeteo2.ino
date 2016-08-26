@@ -30,7 +30,6 @@
 #include <ESP8266HTTPClient.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
-#include <QueueList.h>
 
 // Los pines usados
 #define LLUVIA_PIN  D7
@@ -43,6 +42,8 @@
 
 #define INTERVALO_BASE 60000    // (en milisegundos) 
 #define NUM_INTERVALOS 10       // Número de intervalos base que pasan en cada lectura/trasmision de valores (Ej. 5 * 10s. = 50seg.)
+unsigned long timer_lectura;
+int intervalo;
 
 const uint16_t puerto = 1234;
 const char * servidor = "192.168.1.10"; // ip or dns
@@ -51,38 +52,34 @@ NTPClient timeClient(ntpUDP, "europe.pool.ntp.org");
 int hora_actual;
 
 // BME280: PRESION, TEMPERATURA Y HUMEDAD
-Adafruit_BME280 bme; // I2C
-float temp; // Temperatura del BMP en ºC
-float pres;  // Presion en mbar
-float humi;  // Huemdad relativa en %
-float troc;  // Punto de rocio en ºC
+Adafruit_BME280 bme;  // I2C
+float temp;           // Temperatura del BMP en ºC
+float pres;           // Presion en mbar
+float humi;           // Huemdad relativa en %
+float troc;           // Punto de rocio en ºC
 
 // LLUVIA
 float lluvia_dia;                            // Lluvia diaria
-float lluvia_last_intervalo;                           // Acumulado de lluvia en la ultima hora
+float lluvia_last_intervalo;                 // Acumulado de lluvia en ultimo intervalo
 volatile word lluvia_ticks = 0L;             // variables modified in callback must be volatile
 volatile unsigned long lluvia_last = 0UL;    // the last time the output pin was toggled
-QueueList <word> lluvia_cola;                // Cola FIFO para la gestión de la lluvia ultimo intervalo(s)
+word lluvia_ticks_ant = 0L;                  // Para la gestión de la lluvia ultimo intervalo
 
 // ANEMOMETRO
-float vel_vent;         // Velocidad del viento en km/h
-float vel_racha = 0.0;  // Velocidad de rachas en km/h
-volatile unsigned long anemom_ticks = 0L;    // variables modified in callback must be volatile
-volatile unsigned long anemom_last = 0UL;    // the last time the output pin was toggled
+float vel_vent;                               // Velocidad del viento en km/h
+float vel_racha = 0.0;                        // Velocidad de rachas en km/h
+volatile unsigned long anemom_ticks = 0L;     // variables modified in callback must be volatile
+volatile unsigned long anemom_last = 0UL;     // the last time the output pin was toggled
 
 // VELETA
 const word veletaDir[] = {  0, 23, 45, 68, 90, 113, 135, 158, 180, 203, 225, 248, 270, 293, 315, 338};
 const int veletaVal[] =  {752, 401, 454, 92, 101, 74, 190, 134, 286, 246, 606, 578, 895, 789, 843, 676}; // DETERMINADO EXPERIMENTALMENTE
-
 word dir_vent;  // Direccion del viento en grados sexagesimales. (0 - 359)
-
-unsigned long timer_lectura;
-int intervalo;
 
 // Callback para el contaje de lluvia
 void cuenta_lluvia()
 {
-  if ((millis() - lluvia_last) > 100)  // Fecuencia volteo balancin maxima = 1 / (debounce / 1000) (Con debounce = 200 son 5 volteos/seg. Imposible fisicamente, bien)
+  if ((millis() - lluvia_last) > 200)  // Fecuencia volteo balancin maxima = 1 / (debounce / 1000) (Con debounce = 200 son 5 volteos/seg. Imposible fisicamente, bien)
   {
     lluvia_ticks++;
   }
@@ -147,13 +144,9 @@ void leeVeleta()
 void leeLluvia()
 {
   lluvia_dia = lluvia_ticks * LLUVIA_FACTOR;
-  // Gestion lluvia ultimo(s) intervalo(s)
-  lluvia_cola.push(lluvia_ticks);
-  lluvia_last_intervalo = (lluvia_ticks - lluvia_cola.peek()) * LLUVIA_FACTOR;
-  if(lluvia_cola.count() > 1) // Lluvia en los ultimos n intervalos
-  {
-    lluvia_cola.pop();
-  }
+  // Gestion lluvia ultimo intervalo
+  lluvia_last_intervalo = (lluvia_ticks - lluvia_ticks_ant) * LLUVIA_FACTOR;
+  lluvia_ticks_ant = lluvia_ticks;
 }
 
 void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
@@ -193,7 +186,8 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
       }
       else
       {
-        cliente.print(temp, 1);
+        cliente.print(timeClient.getFormattedTime());
+        cliente.print(", ");cliente.print(temp, 1);
         cliente.print(", ");cliente.print(humi, 0);
         cliente.print(", ");cliente.print(troc, 1);
         cliente.print(", ");cliente.print(pres,1);
@@ -314,13 +308,12 @@ void setup()
   // Prepara el sensor BME280
   if (!bme.begin(0x76))
   {
-    Serial.println("Could not find a valid BME280 sensor, check wiring!");
+    Serial.println("No se encuentra el sensor BME280.");
   }
   // Primera vez
-  lluvia_cola.push(lluvia_ticks);
-  timer_lectura = millis();
-  intervalo = 0;
   hora_actual = timeClient.getHours();
+  intervalo = 0;
+  timer_lectura = millis();
 }
 
 void loop()
@@ -339,7 +332,7 @@ void loop()
       leeBME();
       // Comunicate
       desconectaInterrupts();
-      comunicaPorWifi(false, true);// FALSE:evita acceso a wunder (PARA PRUEBAS)
+      comunicaPorWifi(true, true);
       conectaInterrupts();
       // Comprueba cambio de dia
       hora = timeClient.getHours();
@@ -347,6 +340,7 @@ void loop()
       {
         hora_actual = hora;
         lluvia_ticks = 0;
+        lluvia_ticks_ant = 0;
       }
       // Reset de timer y valores de viento
       intervalo = 0;
