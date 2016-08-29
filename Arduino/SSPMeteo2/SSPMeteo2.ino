@@ -49,7 +49,7 @@ const uint16_t puerto = 1234;
 const char * servidor = "192.168.1.10"; // ip or dns
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "europe.pool.ntp.org");
-int hora_actual;
+int hora_anterior;
 
 // BME280: PRESION, TEMPERATURA Y HUMEDAD
 Adafruit_BME280 bme;  // I2C
@@ -60,7 +60,7 @@ float troc;           // Punto de rocio en ºC
 
 // LLUVIA
 float lluvia_dia;                            // Lluvia diaria
-float lluvia_last_intervalo;                 // Acumulado de lluvia en ultimo intervalo
+float lluvia_por_hora;                 // Acumulado de lluvia en ultimo intervalo
 volatile word lluvia_ticks = 0L;             // variables modified in callback must be volatile
 volatile unsigned long lluvia_last = 0UL;    // the last time the output pin was toggled
 word lluvia_ticks_ant = 0L;                  // Para la gestión de la lluvia ultimo intervalo
@@ -79,7 +79,9 @@ word dir_vent;  // Direccion del viento en grados sexagesimales. (0 - 359)
 // Callback para el contaje de lluvia
 void cuenta_lluvia()
 {
-  if ((millis() - lluvia_last) > 200)  // Fecuencia volteo balancin maxima = 1 / (debounce / 1000) (Con debounce = 200 son 5 volteos/seg. Imposible fisicamente, bien)
+  // Fecuencia volteo balancin maxima = 1 / (debounce / 1000) (Con debounce = 200 son 5 volteos/seg. Imposible fisicamente, bien)
+  // Si hace mas de 20 min. (20 x 60 x 1000 = 1200000) que no llueve no consideres el pulso que entra. Filtro de pulsos espontáneos.
+  if ((millis() - lluvia_last) > 200 && (millis() - lluvia_last) < 1200000)  
   {
     lluvia_ticks++;
   }
@@ -145,7 +147,7 @@ void leeLluvia()
 {
   lluvia_dia = lluvia_ticks * LLUVIA_FACTOR;
   // Gestion lluvia ultimo intervalo
-  lluvia_last_intervalo = (lluvia_ticks - lluvia_ticks_ant) * LLUVIA_FACTOR;
+  lluvia_por_hora = (lluvia_ticks - lluvia_ticks_ant) * LLUVIA_FACTOR * 60.0 / NUM_INTERVALOS;
   lluvia_ticks_ant = lluvia_ticks;
 }
 
@@ -192,7 +194,7 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
         cliente.print(", ");cliente.print(troc, 1);
         cliente.print(", ");cliente.print(pres,1);
         cliente.print(", ");cliente.print(lluvia_dia, 1);
-        cliente.print(", ");cliente.print(lluvia_last_intervalo, 1);
+        cliente.print(", ");cliente.print(lluvia_por_hora, 1);
         cliente.print(", ");cliente.print(vel_vent, 1);
         cliente.print(", ");cliente.print(vel_racha, 1);
         cliente.print(", ");cliente.print(dir_vent);
@@ -211,7 +213,7 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
       uri += "&humidity=";     uri += humi;
       uri += "&dewptf=";       uri += troc;
       uri += "&dailyrainin=";  uri += lluvia_dia;
-      uri += "&rainin=";       uri += lluvia_last_intervalo;
+      uri += "&rainin=";       uri += lluvia_por_hora;
       uri += "&windspeedmph="; uri += vel_vent;
       uri += "&windgustmph=";  uri += vel_racha;
       uri += "&winddir=";      uri += dir_vent;
@@ -286,7 +288,7 @@ void convertirUnidades()
   troc = troc * 1.8 + 32;
   pres *= 0.0295299830714;        // A pulgadas de columna de mercurio
   lluvia_dia /= 25.4;             // En pulgadas
-  lluvia_last_intervalo /= 25.4;  // En pulgadas
+  lluvia_por_hora /= 25.4;  // En pulgadas
   vel_vent *=  0.621371192;       // En mph
   vel_racha *= 0.621371192;       // En mph
 }
@@ -311,7 +313,7 @@ void setup()
     Serial.println("No se encuentra el sensor BME280.");
   }
   // Primera vez
-  hora_actual = timeClient.getHours();
+  hora_anterior = timeClient.getHours();
   intervalo = 0;
   timer_lectura = millis();
 }
@@ -336,12 +338,12 @@ void loop()
       conectaInterrupts();
       // Comprueba cambio de dia
       hora = timeClient.getHours();
-      if ( hora < hora_actual)
+      if ( hora < hora_anterior)
       {
-        hora_actual = hora;
         lluvia_ticks = 0;
         lluvia_ticks_ant = 0;
       }
+      hora_anterior = hora;
       // Reset de timer y valores de viento
       intervalo = 0;
       vel_vent = 0.0;
