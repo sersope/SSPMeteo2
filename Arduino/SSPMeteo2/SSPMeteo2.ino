@@ -40,7 +40,7 @@
 #define LLUVIA_FACTOR 0.138     // Por cada tick de mi pluviómetro. En mm.
 #define ALTITUD 20.0            // En mi casa. en metros.
 
-#define INTERVALO_BASE 60000    // (en milisegundos) 
+#define INTERVALO_BASE 60000    // (en milisegundos)
 #define NUM_INTERVALOS 10       // Número de intervalos base que pasan en cada lectura/trasmision de valores (Ej. 5 * 10s. = 50seg.)
 unsigned long timer_lectura;
 int intervalo;
@@ -74,6 +74,7 @@ volatile unsigned long anemom_last = 0UL;     // the last time the output pin wa
 // VELETA
 const word veletaDir[] = {  0, 23, 45, 68, 90, 113, 135, 158, 180, 203, 225, 248, 270, 293, 315, 338};
 const int veletaVal[] =  {752, 401, 454, 92, 101, 74, 190, 134, 286, 246, 606, 578, 895, 789, 843, 676}; // DETERMINADO EXPERIMENTALMENTE
+int veletaCount[16];    // Lleva la cuenta de las veces que se lee cada dirección
 word dir_vent;  // Direccion del viento en grados sexagesimales. (0 - 359)
 
 // Callback para el contaje de lluvia
@@ -81,7 +82,7 @@ void cuenta_lluvia()
 {
   // Fecuencia volteo balancin maxima = 1 / (debounce / 1000) (Con debounce = 200 son 5 volteos/seg. Imposible fisicamente, bien)
   // Si hace mas de 20 min. (20 x 60 x 1000 = 1200000) que no llueve no consideres el pulso que entra. Filtro de pulsos espontáneos.
-  if ((millis() - lluvia_last) > 200 && (millis() - lluvia_last) < 1200000)  
+  if ((millis() - lluvia_last) > 200 && (millis() - lluvia_last) < 1200000)
   {
     lluvia_ticks++;
   }
@@ -131,6 +132,7 @@ void leeVeleta()
   unsigned int minDif = 2048;
   int i, min_i, dif;
 
+  // Obten la dirección más próxima al valor de lectura
   for (i = 0; i < 16; i++)
   {
     dif = abs(lectura - veletaVal[i]);
@@ -140,7 +142,18 @@ void leeVeleta()
       min_i = i;
     }
   }
-  dir_vent = veletaDir[min_i];
+  veletaCount[min_i] += 1;
+  // La dirección del viento es la que mas veces ha ocurrido
+  unsigned int maxCount = 0, max_i = 0;
+  for (i = 0; i < 16; i++)
+  {
+    if (veletaCount[i] > maxCount)
+    {
+      maxCount = veletaCount[i];
+      max_i = i;
+    }
+  }
+  dir_vent = veletaDir[max_i];
 }
 
 void leeLluvia()
@@ -182,7 +195,7 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
       WiFiClient cliente;
       Serial.print(timeClient.getFormattedTime());
       Serial.print(" Servidor "); Serial.print(servidor);
-      if (!cliente.connect(servidor, puerto)) 
+      if (!cliente.connect(servidor, puerto))
       {
         Serial.println(": Conexión fallida.");
       }
@@ -325,12 +338,12 @@ void loop()
   if ((millis() - timer_lectura) >= INTERVALO_BASE)
   {
     intervalo ++;
+    leeVeleta();
     leeAnemom();
     if (intervalo == NUM_INTERVALOS)
     {
       // Lectura de sensores
       leeLluvia();
-      leeVeleta();
       leeBME();
       // Comunicate
       desconectaInterrupts();
