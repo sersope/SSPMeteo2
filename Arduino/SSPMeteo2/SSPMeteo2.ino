@@ -361,6 +361,9 @@ void loop()
       intervalo = 0;
       vel_vent = 0.0;
       vel_racha = 0.0;
+      int i;
+      for (i = 0; i < 16; i++)
+        veletaCount[i]= 0;
     }
     timer_lectura += INTERVALO_BASE;
   }
