@@ -57,6 +57,12 @@ float temp;           // Temperatura del BMP en ºC
 float pres;           // Presion en mbar
 float humi;           // Huemdad relativa en %
 float troc;           // Punto de rocio en ºC
+float sum_temp = 0.0;
+float min_temp = 1000.0;
+float max_temp = -1000.0;
+float sum_humi = 0.0;
+float min_humi = 1000.0;
+float max_humi = -1000.0;
 
 // LLUVIA
 float lluvia_dia;                            // Lluvia diaria
@@ -102,12 +108,45 @@ void cuenta_anemom()
 // Obten valores de presion y temperatura del BMP
 void leeBME()
 {
-  temp = bme.readTemperature();                       // En ºC
+  float t,h;
+  t = bme.readTemperature();                          // En ºC
   pres = bme.readPressure() / 100;                    // En mbar
   pres = (pres / pow(1.0 - ALTITUD / 44330, 5.255));  // At sea level
-  humi = bme.readHumidity();
-  // Punto de rocío
-  troc = pow(humi / 100.0, 1.0 / 8.0) * (112.0 + 0.9 * temp) + 0.1 * temp - 112.0;
+  h = bme.readHumidity();
+  
+  sum_temp += t;
+  if (t < min_temp)
+      min_temp = t;
+  if (t > max_temp)
+      max_temp = t;
+      
+  sum_humi += h;
+  if (h < min_humi)
+      min_humi = h;
+  if (h > max_humi)
+      max_humi = h;
+
+}
+
+void calcBME()
+{
+    // Elimina valores máximo y minimo y calcula la media
+    sum_temp -= min_temp + max_temp;
+    temp = sum_temp / (NUM_INTERVALOS - 2);
+    
+    sum_humi -= min_humi + max_humi;
+    humi = sum_humi / (NUM_INTERVALOS - 2);
+   
+    // Punto de rocío
+    troc = pow(humi / 100.0, 1.0 / 8.0) * (112.0 + 0.9 * temp) + 0.1 * temp - 112.0;
+    
+    // Resetea valores de intervalo
+    sum_temp = 0.0;
+    min_temp = 1000.0;
+    max_temp = -1000.0;
+    sum_humi = 0.0;
+    min_humi = 1000.0;
+    max_humi = -1000.0;
 }
 
 // Obten la velocidad del viento como promedio en el intervalo NUM_INTERVALOS * INTERVALO_BASE
@@ -143,8 +182,12 @@ void leeVeleta()
     }
   }
   veletaCount[min_i] += 1;
+}
+
+void calcVeleta()
+{
   // La dirección del viento es la que mas veces ha ocurrido
-  unsigned int maxCount = 0, max_i = 0;
+  unsigned int maxCount = 0, max_i = 0, int i;
   for (i = 0; i < 16; i++)
   {
     if (veletaCount[i] > maxCount)
@@ -154,6 +197,10 @@ void leeVeleta()
     }
   }
   dir_vent = veletaDir[max_i];
+  // Resetea contadores
+  for (i = 0; i < 16; i++)
+    veletaCount[i]= 0;
+
 }
 
 void leeLluvia()
@@ -339,12 +386,14 @@ void loop()
   {
     intervalo ++;
     leeVeleta();
+    leeBME();
     leeAnemom();
     if (intervalo == NUM_INTERVALOS)
     {
-      // Lectura de sensores
+      // Calculo de valores
       leeLluvia();
-      leeBME();
+      calcVeleta();
+      calcBME();
       // Comunicate
       desconectaInterrupts();
       comunicaPorWifi(true, true);
@@ -361,9 +410,6 @@ void loop()
       intervalo = 0;
       vel_vent = 0.0;
       vel_racha = 0.0;
-      int i;
-      for (i = 0; i < 16; i++)
-        veletaCount[i]= 0;
     }
     timer_lectura += INTERVALO_BASE;
   }
