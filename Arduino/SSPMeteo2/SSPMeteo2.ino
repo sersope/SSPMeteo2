@@ -187,7 +187,8 @@ void leeVeleta()
 void calcVeleta()
 {
   // La dirección del viento es la que mas veces ha ocurrido
-  unsigned int maxCount = 0, max_i = 0, int i;
+  unsigned int maxCount = 0, max_i = 0;
+  int i;
   for (i = 0; i < 16; i++)
   {
     if (veletaCount[i] > maxCount)
