@@ -40,7 +40,7 @@
 #define LLUVIA_FACTOR 0.138     // Por cada tick de mi pluviómetro. En mm.
 #define ALTITUD 20.0            // En mi casa. en metros.
 
-#define INTERVALO_BASE 60000    // (en milisegundos)
+#define INTERVALO_BASE 30000    // (en milisegundos)
 #define NUM_INTERVALOS 10       // Número de intervalos base que pasan en cada lectura/trasmision de valores (Ej. 5 * 10s. = 50seg.)
 unsigned long timer_lectura;
 int intervalo;
@@ -159,8 +159,8 @@ void leeVeleta()
 void leeLluvia()
 {
   lluvia_dia = lluvia_ticks * LLUVIA_FACTOR;
-  // Gestion lluvia ultimo intervalo
-  lluvia_por_hora = (lluvia_ticks - lluvia_ticks_ant) * LLUVIA_FACTOR * 60.0 / NUM_INTERVALOS;
+  // Gestion lluvia ultima hora
+  lluvia_por_hora = (lluvia_ticks - lluvia_ticks_ant) * LLUVIA_FACTOR * 60.0 * 60.0 * 1000.0 / (INTERVALO_BASE * NUM_INTERVALOS);
   lluvia_ticks_ant = lluvia_ticks;
 }
 
