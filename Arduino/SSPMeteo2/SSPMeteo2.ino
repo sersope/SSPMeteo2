@@ -249,17 +249,18 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
       }
       else
       {
-        cliente.print(timeClient.getFormattedTime());
-        cliente.print(", ");cliente.print(temp, 1);
-        cliente.print(", ");cliente.print(humi, 0);
-        cliente.print(", ");cliente.print(troc, 1);
-        cliente.print(", ");cliente.print(pres,1);
-        cliente.print(", ");cliente.print(lluvia_dia, 1);
-        cliente.print(", ");cliente.print(lluvia_por_hora, 1);
-        cliente.print(", ");cliente.print(vel_vent, 1);
-        cliente.print(", ");cliente.print(vel_racha, 1);
-        cliente.print(", ");cliente.print(dir_vent);
-        cliente.print('Q');
+        String msg = String(timeClient.getFormattedTime());
+        msg += ", "; msg += temp;
+        msg += ", "; msg += humi;
+        msg += ", "; msg += troc;
+        msg += ", "; msg += pres;
+        msg += ", "; msg += lluvia_dia;
+        msg += ", "; msg += lluvia_por_hora;
+        msg += ", "; msg += vel_vent;
+        msg += ", "; msg += vel_racha;
+        msg += ", "; msg += dir_vent;
+        msg += "Q";
+		cliente.print(msg);
         cliente.stop();
         Serial.println(": Datos enviados");
       }
