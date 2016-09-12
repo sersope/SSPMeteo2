@@ -23,7 +23,7 @@
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
 */
-
+#include "DHT.h"
 #include <Wire.h>
 #include <Adafruit_BME280.h>
 #include <ESP8266WiFi.h>
@@ -35,6 +35,7 @@
 #define LLUVIA_PIN  D7
 #define ANEMOM_PIN  D6
 #define VELETA_PIN  A0
+#define DHT22_PIN   D4
 
 #define ANEMOM_FACTOR 2.4       // km/h para un giro de un segundo. Para anemometro WH1080.
 #define LLUVIA_FACTOR 0.138     // Por cada tick de mi pluviómetro. En mm.
@@ -53,10 +54,15 @@ int hora_anterior;
 
 // BME280: PRESION, TEMPERATURA Y HUMEDAD
 Adafruit_BME280 bme;  // I2C
-float temp;           // Temperatura del BMP en ºC
+float temp2;           // Temperatura del BMP en ºC
 float pres;           // Presion en mbar
-float humi;           // Huemdad relativa en %
-float troc;           // Punto de rocio en ºC
+float humi2;           // Huemdad relativa en %
+
+// DHT22: TEMPERATURA Y HUMEDAD
+DHT dht(DHT22_PIN, DHT22);
+float humi;  			// Huemdad relativa en %
+float temp;  			// Temperatura en ºC
+float troc;           	// Punto de rocio en ºC
 float sum_temp = 0.0;
 float min_temp = 1000.0;
 float max_temp = -1000.0;
@@ -105,15 +111,28 @@ void cuenta_anemom()
   anemom_last = millis();
 }
 
-// Obten valores de presion y temperatura del BMP
+// Obten valores de presion, temperatura y humedad del BMP
 void leeBME()
 {
-  float t,h;
-  t = bme.readTemperature();                          // En ºC
+  temp2 = bme.readTemperature();                      // En ºC
+  humi2 = bme.readHumidity();
   pres = bme.readPressure() / 100;                    // En mbar
-  pres = (pres / pow(1.0 - ALTITUD / 44330, 5.255));  // At sea level
-  h = bme.readHumidity();
-  
+  pres = (pres / pow(1.0 - ALTITUD / 44330, 5.255));  // At sea level	
+}
+
+// Obten valores de temperatura y humedad del DHT
+void leeDHT()
+{
+  float t,h;
+  h = dht.readHumidity();
+  t = dht.readTemperature(); // En ºC
+  // Si algun fallo en la lectura manten el valor actual
+  if (isnan(auxhumi) || isnan(auxtemp))
+  {
+    h = humi;
+    t = temp;
+  }
+
   sum_temp += t;
   if (t < min_temp)
       min_temp = t;
@@ -125,10 +144,9 @@ void leeBME()
       min_humi = h;
   if (h > max_humi)
       max_humi = h;
-
 }
 
-void calcBME()
+void calcDHT()
 {
     // Elimina valores máximo y minimo y calcula la media
     sum_temp -= min_temp + max_temp;
@@ -186,7 +204,7 @@ void leeVeleta()
 
 void calcVeleta()
 {
-  // La dirección del viento es la que mas veces ha ocurrido
+  // La dirección del viento es la que mas veces ha ocurrido (la moda) en el intervalo
   unsigned int maxCount = 0, max_i = 0;
   int i;
   for (i = 0; i < 16; i++)
@@ -200,14 +218,14 @@ void calcVeleta()
   dir_vent = veletaDir[max_i];
   // Resetea contadores
   for (i = 0; i < 16; i++)
-    veletaCount[i]= 0;
+    veletaCount[i] = 0;
 
 }
 
 void leeLluvia()
 {
   lluvia_dia = lluvia_ticks * LLUVIA_FACTOR;
-  // Gestion lluvia ultima hora
+  // Calculo lluvia/hora
   lluvia_por_hora = (lluvia_ticks - lluvia_ticks_ant) * LLUVIA_FACTOR * 60.0 * 60.0 * 1000.0 / (INTERVALO_BASE * NUM_INTERVALOS);
   lluvia_ticks_ant = lluvia_ticks;
 }
@@ -251,7 +269,9 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
       {
         String msg = String(timeClient.getFormattedTime());
         msg += ", "; msg += temp;
+        msg += ", "; msg += temp2;
         msg += ", "; msg += humi;
+        msg += ", "; msg += humi2;
         msg += ", "; msg += troc;
         msg += ", "; msg += pres;
         msg += ", "; msg += lluvia_dia;
@@ -347,10 +367,10 @@ void desconectaInterrupts()
 void convertirUnidades()
 {
   temp = temp * 1.8 + 32;         // to ºF
-  troc = troc * 1.8 + 32;
+  troc = troc * 1.8 + 32;		  // to ºF
   pres *= 0.0295299830714;        // A pulgadas de columna de mercurio
   lluvia_dia /= 25.4;             // En pulgadas
-  lluvia_por_hora /= 25.4;  // En pulgadas
+  lluvia_por_hora /= 25.4;  	  // En pulgadas
   vel_vent *=  0.621371192;       // En mph
   vel_racha *= 0.621371192;       // En mph
 }
@@ -369,6 +389,9 @@ void setup()
   // Para el conteo del anemometro
   pinMode(ANEMOM_PIN, INPUT_PULLUP);
   conectaInterrupts();
+  // Prepara el sensor DHT22
+  pinMode(DHT22_PIN, INPUT_PULLUP);
+  dht.begin();
   // Prepara el sensor BME280
   if (!bme.begin(0x76))
   {
@@ -388,14 +411,15 @@ void loop()
   {
     intervalo ++;
     leeVeleta();
-    leeBME();
+    leeDHT();
     leeAnemom();
     if (intervalo == NUM_INTERVALOS)
     {
       // Calculo de valores
       leeLluvia();
+      leeBME();
       calcVeleta();
-      calcBME();
+      calcDHT();
       // Comunicate
       desconectaInterrupts();
       comunicaPorWifi(true, true);
