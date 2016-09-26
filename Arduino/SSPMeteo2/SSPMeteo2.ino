@@ -31,6 +31,8 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
+
+
 // Los pines usados
 #define LLUVIA_PIN  D7
 #define ANEMOM_PIN  D6
@@ -50,6 +52,13 @@ const char * servidor = "192.168.1.10"; // ip or dns
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "europe.pool.ntp.org");
 int hora_anterior;
+
+// watchdog y contadores de errores
+unsigned long watchdog;
+unsigned long conterr_wifi;
+unsigned long conterr_ntp;
+unsigned long conterr_server;
+unsigned long conterr_wunder;
 
 // BME280: PRESION, TEMPERATURA Y HUMEDAD
 Adafruit_BME280 bme;  // I2C
@@ -245,6 +254,7 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
       Serial.print(" Servidor "); Serial.print(servidor);
       if (!cliente.connect(servidor, puerto))
       {
+        conterr_server++;
         Serial.println(": Conexión fallida.");
       }
       else
@@ -259,6 +269,11 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
         msg += ", "; msg += vel_vent;
         msg += ", "; msg += vel_racha;
         msg += ", "; msg += dir_vent;
+        msg += ", "; msg += watchdog;
+        msg += ", "; msg += conterr_wifi;
+        msg += ", "; msg += conterr_server;
+        msg += ", "; msg += conterr_wunder;
+        msg += ", "; msg += conterr_ntp;
         msg += "Q";
 		cliente.print(msg);
         cliente.stop();
@@ -294,6 +309,7 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
       }
       else
       {
+        conterr_wunder++;
         Serial.print("error: "); Serial.println(http.errorToString(httpCode).c_str());
       }
       http.end();
@@ -310,6 +326,7 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
     }
     else
     {
+      conterr_ntp++;
       Serial.println("error");
     }
     timeClient.end();
@@ -323,6 +340,7 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
   }
   else
   {
+    conterr_wifi++;
     Serial.print(timeClient.getFormattedTime());
     Serial.print(" WiFi desconectada en ");
     Serial.print((millis() - ini) / 1000.0, 3);
@@ -398,11 +416,12 @@ void loop()
       calcBME();
       // Comunicate
       desconectaInterrupts();
+      watchdog++;
       comunicaPorWifi(true, true);
       conectaInterrupts();
       // Comprueba cambio de dia
       hora = timeClient.getHours();
-      if ( hora < hora_anterior)
+      if ( hora < hora_anterior && hora_anterior == 23)
       {
         lluvia_ticks = 0;
         lluvia_ticks_ant = 0;
