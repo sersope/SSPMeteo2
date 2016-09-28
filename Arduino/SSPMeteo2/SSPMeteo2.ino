@@ -50,7 +50,7 @@ int intervalo;
 const uint16_t puerto = 1234;
 const char * servidor = "192.168.1.10"; // ip or dns
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "europe.pool.ntp.org");
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 7200, 3600000); // Dos horas de offset y actualiza cada hora
 int hora_anterior;
 
 // watchdog y contadores de errores
@@ -213,7 +213,7 @@ void calcVeleta()
 
 }
 
-void leeLluvia()
+void calcLluvia()
 {
   lluvia_dia = lluvia_ticks * LLUVIA_FACTOR;
   // Gestion lluvia ultima hora
@@ -226,60 +226,47 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
   const char* ssid     = "Wsergio";
   const char* password = "cochin29";
   float ini;
+  int wifi_timer = 0;
 
-  Serial.print(timeClient.getFormattedTime());
-  Serial.print(" Conectando Wifi...");
-  Serial.print(" Estado:");
-  Serial.println(WiFi.status());
+  //Serial.print(timeClient.getFormattedTime());
+  //Serial.print(" Conectando Wifi...");
+  //Serial.print(" Estado:");
+  //Serial.println(WiFi.status());
   ini = millis();
   WiFi.begin(ssid, password);
-  while (WiFi.status() == WL_DISCONNECTED)
+  while (WiFi.status() == WL_DISCONNECTED && wifi_timer < 100)
   {
     delay(10);
+    wifi_timer++;
   }
   if (WiFi.status() == WL_CONNECTED)
   {
-    Serial.print(timeClient.getFormattedTime());
-    Serial.print(" WiFi conectada en ");
-    Serial.print((millis() - ini) / 1000.0, 3);
-    Serial.print(" Estado:");
-    Serial.print(WiFi.status());
-    Serial.print(" IP:");
-    Serial.println(WiFi.localIP());
-    // Envio al servidor
-    if (send_to_servidor)
+    //Serial.print(timeClient.getFormattedTime());
+    //Serial.print(" WiFi conectada en ");
+    //Serial.print((millis() - ini) / 1000.0, 3);
+    //Serial.print(" Estado:");
+    //Serial.print(WiFi.status());
+    //Serial.print(" IP:");
+    //Serial.println(WiFi.localIP());
+    
+    // Actualiza hora del día (via NTP)
+    bool horaOK;
+    timeClient.begin();
+    horaOK = timeClient.update();
+    //Serial.print(timeClient.getFormattedTime());
+    //Serial.print(" NTP: ");
+    if (horaOK)
     {
-      WiFiClient cliente;
-      Serial.print(timeClient.getFormattedTime());
-      Serial.print(" Servidor "); Serial.print(servidor);
-      if (!cliente.connect(servidor, puerto))
-      {
-        conterr_server++;
-        Serial.println(": Conexión fallida.");
-      }
-      else
-      {
-        String msg = String(timeClient.getFormattedTime());
-        msg += ", "; msg += temp;
-        msg += ", "; msg += humi;
-        msg += ", "; msg += troc;
-        msg += ", "; msg += pres;
-        msg += ", "; msg += lluvia_dia;
-        msg += ", "; msg += lluvia_por_hora;
-        msg += ", "; msg += vel_vent;
-        msg += ", "; msg += vel_racha;
-        msg += ", "; msg += dir_vent;
-        msg += ", "; msg += watchdog;
-        msg += ", "; msg += conterr_wifi;
-        msg += ", "; msg += conterr_server;
-        msg += ", "; msg += conterr_wunder;
-        msg += ", "; msg += conterr_ntp;
-        msg += "Q";
-		cliente.print(msg);
-        cliente.stop();
-        Serial.println(": Datos enviados");
-      }
+      horaOK = true;
+      //Serial.println("OK");
     }
+    else
+    {
+      conterr_ntp++;
+      //Serial.println("error");
+    }
+    timeClient.end();
+    
     // Acceso a Wunder
     if (send_to_wunder)
     {
@@ -297,57 +284,67 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
       uri += "&baromin=";      uri += pres;
       http.begin(uri);
       int httpCode = http.GET();
-      Serial.print(timeClient.getFormattedTime());
-      Serial.print(" Wunder: ");
-      if (httpCode > 0)
+      //Serial.print(timeClient.getFormattedTime());
+      //Serial.print(" Wunder: ");
+      if (httpCode == HTTP_CODE_OK)
       {
-        if (httpCode == HTTP_CODE_OK)
-        {
-          String payload = http.getString();
-          Serial.print(payload);
-        }
+        String payload = http.getString();
+        //Serial.print(payload);
       }
       else
       {
         conterr_wunder++;
-        Serial.print("error: "); Serial.println(http.errorToString(httpCode).c_str());
+        //Serial.print("error: "); //Serial.println(http.errorToString(httpCode).c_str());
       }
       http.end();
     }
-    // Actualiza hora del día (via NTP)
-    bool horaOK;
-    timeClient.begin();
-    horaOK = timeClient.update();
-    Serial.print(timeClient.getFormattedTime());
-    Serial.print(" NTP: ");
-    if (horaOK)
+    // Envio al servidor
+    if (send_to_servidor)
     {
-      Serial.println("OK");
-    }
-    else
-    {
-      conterr_ntp++;
-      Serial.println("error");
-    }
-    timeClient.end();
-    // Fin de la WiFi
-    WiFi.disconnect();
-    Serial.print(timeClient.getFormattedTime());
-    Serial.print(" WiFi desconectada en ");
-    Serial.print((millis() - ini) / 1000.0, 3);
-    Serial.print(" Estado:");
-    Serial.println(WiFi.status());
+      WiFiClient cliente;
+      //Serial.print(timeClient.getFormattedTime());
+      //Serial.print(" Servidor "); //Serial.print(servidor);
+      if (!cliente.connect(servidor, puerto))
+      {
+        conterr_server++;
+        //Serial.println(": Conexión fallida.");
+      }
+      else
+      {
+        String msg = String(timeClient.getFormattedTime());
+        msg += ", "; msg += temp;
+        msg += ", "; msg += humi;
+        msg += ", "; msg += troc;
+        msg += ", "; msg += pres;
+        msg += ", "; msg += lluvia_dia;
+        msg += ", "; msg += lluvia_por_hora;
+        msg += ", "; msg += vel_vent;
+        msg += ", "; msg += vel_racha;
+        msg += ", "; msg += dir_vent;
+        msg += ", "; msg += watchdog;
+        msg += ", "; msg += conterr_wifi;
+        msg += ", "; msg += conterr_ntp;
+        msg += ", "; msg += conterr_wunder;
+        msg += ", "; msg += conterr_server;
+        msg += "Q";
+        cliente.print(msg);
+        //Serial.println(": Datos enviados");
+      }
+      cliente.stop();
+    }       
   }
   else
   {
     conterr_wifi++;
-    Serial.print(timeClient.getFormattedTime());
-    Serial.print(" WiFi desconectada en ");
-    Serial.print((millis() - ini) / 1000.0, 3);
-    Serial.print(" Estado:");
-    Serial.println(WiFi.status());
   }
-  Serial.println("");
+  // Fin de la WiFi
+  WiFi.disconnect();
+  //Serial.print(timeClient.getFormattedTime());
+  //Serial.print(" WiFi desconectada en ");
+  //Serial.print((millis() - ini) / 1000.0, 3);
+  //Serial.print(" Estado:");
+  //Serial.println(WiFi.status());
+  //Serial.println("");
 }
 
 void conectaInterrupts()
@@ -411,7 +408,7 @@ void loop()
     if (intervalo == NUM_INTERVALOS)
     {
       // Calculo de valores
-      leeLluvia();
+      calcLluvia();
       calcVeleta();
       calcBME();
       // Comunicate
