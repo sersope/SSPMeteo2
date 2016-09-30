@@ -47,6 +47,13 @@
 unsigned long timer_lectura;
 int intervalo;
 
+// Direcciones para la conexión Wifi
+IPAddress staticIP(192,168,1,11);
+IPAddress gateway(192,168,1,33);
+IPAddress subnet(255,255,255,0);
+IPAddress dns1(8,8,8,8);
+IPAddress dns2(8,8,4,4);
+
 const uint16_t puerto = 1234;
 const char * servidor = "192.168.1.10"; // ip or dns
 WiFiUDP ntpUDP;
@@ -91,6 +98,15 @@ const word veletaDir[] = {  0, 23, 45, 68, 90, 113, 135, 158, 180, 203, 225, 248
 const int veletaVal[] =  {752, 401, 454, 92, 101, 74, 190, 134, 286, 246, 606, 578, 895, 789, 843, 676}; // DETERMINADO EXPERIMENTALMENTE
 int veletaCount[16];    // Lleva la cuenta de las veces que se lee cada dirección
 word dir_vent;  // Direccion del viento en grados sexagesimales. (0 - 359)
+
+// Valores convertidos a unidades imperiales para Wunder
+float tempW;
+float presW;
+float trocW;
+float lluvia_diaW;
+float lluvia_por_horaW;
+float vel_ventW;
+float vel_rachaW;
 
 // Callback para el contaje de lluvia
 void cuenta_lluvia()
@@ -226,44 +242,45 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
   const char* ssid     = "Wsergio";
   const char* password = "cochin29";
   float ini;
-  int wifi_timer = 0;
 
-  //Serial.print(timeClient.getFormattedTime());
-  //Serial.print(" Conectando Wifi...");
-  //Serial.print(" Estado:");
-  //Serial.println(WiFi.status());
+  Serial.print(timeClient.getFormattedTime());
+  Serial.print(" Conectando Wifi...");
+  Serial.print(" Estado:");
+  Serial.println(WiFi.status());
   ini = millis();
   WiFi.begin(ssid, password);
-  while (WiFi.status() == WL_DISCONNECTED && wifi_timer < 100)
+  WiFi.config(staticIP, gateway, subnet, dns1, dns2);
+  while (WiFi.status() != WL_CONNECTED)
   {
-    delay(10);
-    wifi_timer++;
+    Serial.print(".");
+    delay(100);
   }
+  Serial.println(' ');
   if (WiFi.status() == WL_CONNECTED)
   {
-    //Serial.print(timeClient.getFormattedTime());
-    //Serial.print(" WiFi conectada en ");
-    //Serial.print((millis() - ini) / 1000.0, 3);
-    //Serial.print(" Estado:");
-    //Serial.print(WiFi.status());
-    //Serial.print(" IP:");
-    //Serial.println(WiFi.localIP());
+    Serial.print(timeClient.getFormattedTime());
+    Serial.print(" WiFi conectada en ");
+    Serial.print((millis() - ini) / 1000.0, 3);
+    Serial.print(" Estado:");
+    Serial.print(WiFi.status());
+    Serial.print(" IP:");
+    Serial.println(WiFi.localIP());
     
     // Actualiza hora del día (via NTP)
     bool horaOK;
     timeClient.begin();
     horaOK = timeClient.update();
-    //Serial.print(timeClient.getFormattedTime());
-    //Serial.print(" NTP: ");
+    Serial.print(timeClient.getFormattedTime());
+    Serial.print(" NTP: ");
     if (horaOK)
     {
       horaOK = true;
-      //Serial.println("OK");
+      Serial.println("OK");
     }
     else
     {
       conterr_ntp++;
-      //Serial.println("error");
+      Serial.println("error");
     }
     timeClient.end();
     
@@ -273,28 +290,28 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
       convertirUnidades(); // A Wunder unidades imperiales
       HTTPClient http;
       String uri = String("http://weatherstation.wunderground.com/weatherstation/updateweatherstation.php?ID=ICOMUNID54&PASSWORD=laura11&action=updateraw&dateutc=now");
-      uri += "&tempf=";        uri += temp;
+      uri += "&tempf=";        uri += tempW;
       uri += "&humidity=";     uri += humi;
-      uri += "&dewptf=";       uri += troc;
-      uri += "&dailyrainin=";  uri += lluvia_dia;
-      uri += "&rainin=";       uri += lluvia_por_hora;
-      uri += "&windspeedmph="; uri += vel_vent;
-      uri += "&windgustmph=";  uri += vel_racha;
+      uri += "&dewptf=";       uri += trocW;
+      uri += "&dailyrainin=";  uri += lluvia_diaW;
+      uri += "&rainin=";       uri += lluvia_por_horaW;
+      uri += "&windspeedmph="; uri += vel_ventW;
+      uri += "&windgustmph=";  uri += vel_rachaW;
       uri += "&winddir=";      uri += dir_vent;
-      uri += "&baromin=";      uri += pres;
+      uri += "&baromin=";      uri += presW;
       http.begin(uri);
       int httpCode = http.GET();
-      //Serial.print(timeClient.getFormattedTime());
-      //Serial.print(" Wunder: ");
+      Serial.print(timeClient.getFormattedTime());
+      Serial.print(" Wunder: ");
       if (httpCode == HTTP_CODE_OK)
       {
         String payload = http.getString();
-        //Serial.print(payload);
+        Serial.print(payload);
       }
       else
       {
         conterr_wunder++;
-        //Serial.print("error: "); //Serial.println(http.errorToString(httpCode).c_str());
+        Serial.print("error: "); Serial.println(http.errorToString(httpCode).c_str());
       }
       http.end();
     }
@@ -302,12 +319,12 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
     if (send_to_servidor)
     {
       WiFiClient cliente;
-      //Serial.print(timeClient.getFormattedTime());
-      //Serial.print(" Servidor "); //Serial.print(servidor);
+      Serial.print(timeClient.getFormattedTime());
+      Serial.print(" Servidor "); Serial.print(servidor);
       if (!cliente.connect(servidor, puerto))
       {
         conterr_server++;
-        //Serial.println(": Conexión fallida.");
+        Serial.println(": Conexión fallida.");
       }
       else
       {
@@ -328,7 +345,7 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
         msg += ", "; msg += conterr_server;
         msg += "Q";
         cliente.print(msg);
-        //Serial.println(": Datos enviados");
+        Serial.println(": Datos enviados");
       }
       cliente.stop();
     }       
@@ -339,12 +356,12 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
   }
   // Fin de la WiFi
   WiFi.disconnect();
-  //Serial.print(timeClient.getFormattedTime());
-  //Serial.print(" WiFi desconectada en ");
-  //Serial.print((millis() - ini) / 1000.0, 3);
-  //Serial.print(" Estado:");
-  //Serial.println(WiFi.status());
-  //Serial.println("");
+  Serial.print(timeClient.getFormattedTime());
+  Serial.print(" WiFi desconectada en ");
+  Serial.print((millis() - ini) / 1000.0, 3);
+  Serial.print(" Estado:");
+  Serial.println(WiFi.status());
+  Serial.println("");
 }
 
 void conectaInterrupts()
@@ -361,13 +378,13 @@ void desconectaInterrupts()
 
 void convertirUnidades()
 {
-  temp = temp * 1.8 + 32;         // to ºF
-  troc = troc * 1.8 + 32;
-  pres *= 0.0295299830714;        // A pulgadas de columna de mercurio
-  lluvia_dia /= 25.4;             // En pulgadas
-  lluvia_por_hora /= 25.4;  // En pulgadas
-  vel_vent *=  0.621371192;       // En mph
-  vel_racha *= 0.621371192;       // En mph
+  tempW = temp * 1.8 + 32;                      // to ºF
+  trocW = troc * 1.8 + 32;                      // to ºF
+  presW = pres * 0.0295299830714;               // A pulgadas de columna de mercurio
+  lluvia_diaW = lluvia_dia / 25.4;              // En pulgadas
+  lluvia_por_horaW = lluvia_por_hora / 25.4;    // En pulgadas
+  vel_ventW =  vel_vent * 0.621371192;          // En mph
+  vel_rachaW = vel_racha *0.621371192;          // En mph
 }
 
 void setup()
