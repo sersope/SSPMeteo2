@@ -243,44 +243,44 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
   const char* password = "cochin29";
   float ini;
 
-  Serial.print(timeClient.getFormattedTime());
-  Serial.print(" Conectando Wifi...");
-  Serial.print(" Estado:");
-  Serial.println(WiFi.status());
+  //Serial.print(timeClient.getFormattedTime());
+  //Serial.print(" Conectando Wifi...");
+  //Serial.print(" Estado:");
+  //Serial.println(WiFi.status());
   ini = millis();
   WiFi.begin(ssid, password);
   WiFi.config(staticIP, gateway, subnet, dns1, dns2);
   while (WiFi.status() != WL_CONNECTED)
   {
-    Serial.print(".");
+    //Serial.print(".");
     delay(100);
   }
-  Serial.println(' ');
+  //Serial.println(' ');
   if (WiFi.status() == WL_CONNECTED)
   {
-    Serial.print(timeClient.getFormattedTime());
-    Serial.print(" WiFi conectada en ");
-    Serial.print((millis() - ini) / 1000.0, 3);
-    Serial.print(" Estado:");
-    Serial.print(WiFi.status());
-    Serial.print(" IP:");
-    Serial.println(WiFi.localIP());
+    //Serial.print(timeClient.getFormattedTime());
+    //Serial.print(" WiFi conectada en ");
+    //Serial.print((millis() - ini) / 1000.0, 3);
+    //Serial.print(" Estado:");
+    //Serial.print(WiFi.status());
+    //Serial.print(" IP:");
+    //Serial.println(WiFi.localIP());
     
     // Actualiza hora del día (via NTP)
     bool horaOK;
     timeClient.begin();
     horaOK = timeClient.update();
-    Serial.print(timeClient.getFormattedTime());
-    Serial.print(" NTP: ");
+    //Serial.print(timeClient.getFormattedTime());
+    //Serial.print(" NTP: ");
     if (horaOK)
     {
       horaOK = true;
-      Serial.println("OK");
+      //Serial.println("OK");
     }
     else
     {
       conterr_ntp++;
-      Serial.println("error");
+      //Serial.println("error");
     }
     timeClient.end();
     
@@ -301,17 +301,17 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
       uri += "&baromin=";      uri += presW;
       http.begin(uri);
       int httpCode = http.GET();
-      Serial.print(timeClient.getFormattedTime());
-      Serial.print(" Wunder: ");
+      //Serial.print(timeClient.getFormattedTime());
+      //Serial.print(" Wunder: ");
       if (httpCode == HTTP_CODE_OK)
       {
         String payload = http.getString();
-        Serial.print(payload);
+        //Serial.print(payload);
       }
       else
       {
         conterr_wunder++;
-        Serial.print("error: "); Serial.println(http.errorToString(httpCode).c_str());
+        //Serial.print("error: "); //Serial.println(http.errorToString(httpCode).c_str());
       }
       http.end();
     }
@@ -319,12 +319,12 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
     if (send_to_servidor)
     {
       WiFiClient cliente;
-      Serial.print(timeClient.getFormattedTime());
-      Serial.print(" Servidor "); Serial.print(servidor);
+      //Serial.print(timeClient.getFormattedTime());
+      //Serial.print(" Servidor "); //Serial.print(servidor);
       if (!cliente.connect(servidor, puerto))
       {
         conterr_server++;
-        Serial.println(": Conexión fallida.");
+        //Serial.println(": Conexión fallida.");
       }
       else
       {
@@ -343,9 +343,10 @@ void comunicaPorWifi(bool send_to_wunder = false, bool send_to_servidor= true)
         msg += ", "; msg += conterr_ntp;
         msg += ", "; msg += conterr_wunder;
         msg += ", "; msg += conterr_server;
+        msg += ", "; msg += (millis() - ini) / 1000.0;   // Duracion en segundos del acceso Wifi
         msg += "Q";
         cliente.print(msg);
-        Serial.println(": Datos enviados");
+        //Serial.println(": Datos enviados");
       }
       cliente.stop();
     }       
