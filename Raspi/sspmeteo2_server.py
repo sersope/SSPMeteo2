@@ -23,7 +23,7 @@ class MiPantallita:
     def update(self, datos):
         lval = datos.split(', ')
         val = [float(x) for x in lval[1:]]     # Remove wemos date (lval[0])
-        status = datetime.now().strftime('%X') + '   '
+        #~ status = datetime.now().strftime('%X') + '   '
         with canvas(self.oled) as draw:
             # Line 1 - Temp. and humidity
             line = '{:.1f}º {:.0f}%'.format(val[0],val[1])
@@ -38,7 +38,7 @@ class MiPantallita:
             if val[4] > 0 or val[5] > 0:
                 if val[5] > 0:
                     line = '{:.1f}mm/h {:.0f}mm'.format(val[5],val[4])
-                    status = '¡ LLUEVE !   '
+                    #~ status = '¡ LLUEVE !   '
                 else:
                     line = 'Lluvia diaria {:.0f}mm'.format(val[4])
             draw.text((0, 28), line, 1, self.font2)
@@ -49,7 +49,10 @@ class MiPantallita:
             draw.text((0, 40), line, 1, font)
             
             # Line 4 - Status
-            draw.text((0, 52), status + lval[0], 1, self.font2)
+            d, resto = divmod(val[9] * 5, 24 * 60)
+            h, m = divmod(resto, 60)
+            line = '{} {}d{}:{}'.format(lval[0], int(d), int(h), int(m))
+            draw.text((0, 52), line, 1, self.font2)
     
 class Server:
     def __init__(self, port):
