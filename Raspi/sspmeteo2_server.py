@@ -8,12 +8,12 @@ FONT_FILE0 = 'Roboto-BoldCondensed.ttf'
 FONT_FILE1 = 'wwDigital.ttf'
 
 class MiOled:
-    
+
     oled = sh1106()
     font0 = ImageFont.truetype(FONT_FILE0, 30)
     font1 = ImageFont.truetype(FONT_FILE0, 24)
     font2 = ImageFont.truetype(FONT_FILE1, 12)
-    
+
     @classmethod
     def begin(cls):
         with canvas(cls.oled) as draw:
@@ -35,7 +35,7 @@ class MiOled:
                 font = cls.font1
             of = int((cls.oled.width - draw.textsize(line, font)[0]) / 2)
             draw.text((0 + of, 0), line, 1, font)
-            
+
             # Line 2 - Rain
             line = ''
             if val[4] > 0 or val[5] > 0:
@@ -45,12 +45,12 @@ class MiOled:
                 else:
                     line = 'Lluvia diaria {:.0f}mm'.format(val[4])
             draw.text((0, 28), line, 1, cls.font2)
-            
+
             # Line 3 - Pressure and wind
             line = '{:.0f}mb {:.0f}kph {:.0f}º'.format(val[3],val[6],val[8])
             font = cls.font2
             draw.text((0, 40), line, 1, font)
-            
+
             # Line 4 - Status
             d, resto = divmod(val[9] * 5, 24 * 60)
             h, m = divmod(resto, 60)
@@ -58,20 +58,28 @@ class MiOled:
             draw.text((0, 52), line, 1, cls.font2)
 
 
+class Datos:
+    datos = 'NADA'
+
+
 class MiTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         datos = self.request.recv(256).decode()
         if 'Q' in datos:
             datos = datos.replace('Q','')
+            Datos.datos = datos
             logging.info(datos)
             MiOled.update(datos)
+        elif 'GET_DATOS' in datos:
+            self.request.sendall(Datos.datos.encode())
+
 
 if __name__ == "__main__":
     logconf = { 'filename'  : 'datos.log',
                 'level'     : logging.INFO,
                 'format'    : '%(asctime)s, %(message)s',
                 'datefmt'   : '%c'}
-                
+
     logging.basicConfig(**logconf)
     logging.info('A la escucha ...')
     MiOled.begin()
