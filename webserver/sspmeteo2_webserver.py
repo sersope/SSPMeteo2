@@ -14,17 +14,19 @@ def send_static(filename):
 @route('/sspmeteo2')
 def hello():
     datos = ['0' for i in range(16)]
+    datos[4] = '950'
     try:
         s = socket.socket()
         s.connect((data_server, data_server_port))
         s.send('GET_DATOS'.encode())
         datos = s.recv(256).decode().split(',')
         s.close()
+        datos[0] = 'Datos actualizados a las ' + datos[0]
     except:
         datos[0]= "ERROR en el acceso al servidor de datos."
     return template('sspmeteo2', datos=datos)
-    
-    
+
+
 # Parse argumentos de linea de comandos
 usage = 'Usage: -p <web server port> -S <data server> -P <data server port>'
 try:
@@ -48,7 +50,7 @@ for opt, arg in opts:
     else:
         print(usage)
         sys.exit()
-        
+
 print('Data server: ', data_server + ':' + str(data_server_port))
 # Lanza el servidor
 run(host='', port=web_server_port)
