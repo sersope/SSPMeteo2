@@ -1,5 +1,5 @@
 import socketserver
-#~ from sspmeteo2_oled import SSPMeteoOled
+from sspmeteo2_oled import SSPMeteoOled
 from datetime import datetime
 
 class Datos:
@@ -19,12 +19,12 @@ class MiTCPHandler(socketserver.BaseRequestHandler):
         if 'Q' in req:
             datos = req.replace('Q','')
             Datos.salvaDatos(datos)
-            #~ SSPMeteoOled.update(datos)
+            SSPMeteoOled.update(datos)
         elif 'GET_DATOS' in req:
             self.request.sendall(Datos.datos.encode())
 
 if __name__ == "__main__":
-    #~ SSPMeteoOled.begin()
+    SSPMeteoOled.begin()
     HOST, PORT = "", 1234
     server = socketserver.TCPServer((HOST, PORT), MiTCPHandler)
     server.serve_forever()
