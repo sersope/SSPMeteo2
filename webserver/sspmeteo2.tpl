@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>SSPMeteo2</title>
-    <link rel="icon" type="image/vnd.microsoft.icon" href="static/favicon.ico" />
+    <link rel="icon" type="image/png" href="static/favicon.png" />
     <script src="static/gauge.min.js"></script>
 </head>
 <body style="font-family:arial;max-width:630px;margin:auto">
