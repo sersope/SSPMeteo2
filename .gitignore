@@ -1,4 +1,4 @@
 *.log
 *.dat
 datos
-
+__pycache__
