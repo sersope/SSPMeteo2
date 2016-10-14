@@ -1,5 +1,3 @@
-import socketserver
-import logging
 from oled.device import sh1106
 from oled.render import canvas
 from PIL import ImageDraw, ImageFont
@@ -7,7 +5,7 @@ from PIL import ImageDraw, ImageFont
 FONT_FILE0 = 'Roboto-BoldCondensed.ttf'
 FONT_FILE1 = 'wwDigital.ttf'
 
-class MiOled:
+class SSPMeteoOled:
 
     oled = sh1106()
     font0 = ImageFont.truetype(FONT_FILE0, 30)
@@ -57,32 +55,5 @@ class MiOled:
             line = '{} {}d{}:{}'.format(lval[0], int(d), int(h), int(m))
             draw.text((0, 52), line, 1, cls.font2)
 
-
-class Datos:
-    datos = 'NADA'
-
-
-class MiTCPHandler(socketserver.BaseRequestHandler):
-    def handle(self):
-        datos = self.request.recv(256).decode()
-        if 'Q' in datos:
-            datos = datos.replace('Q','')
-            Datos.datos = datos
-            logging.info(datos)
-            MiOled.update(datos)
-        elif 'GET_DATOS' in datos:
-            self.request.sendall(Datos.datos.encode())
-
-
 if __name__ == "__main__":
-    logconf = { 'filename'  : 'datos.log',
-                'level'     : logging.INFO,
-                'format'    : '%(asctime)s, %(message)s',
-                'datefmt'   : '%c'}
-
-    logging.basicConfig(**logconf)
-    logging.info('A la escucha ...')
-    MiOled.begin()
-    HOST, PORT = "", 1234
-    server = socketserver.TCPServer((HOST, PORT), MiTCPHandler)
-    server.serve_forever()
+    SSPMeteoOled.begin()
