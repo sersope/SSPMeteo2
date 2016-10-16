@@ -53,7 +53,7 @@ class SSPMeteoOled:
             return
         with canvas(cls.oled) as draw:
             # Line 1 - Temp. and humidity
-            line = '{:.1f}º {:.0f}%'.format(val[0],val[1])
+            line = '{:.1f}º {:.0f}%'.format(val[0],val[2])
             font = cls.font0
             if draw.textsize(line, font)[0] > cls.oled.width:
                 font = cls.font1
@@ -62,21 +62,21 @@ class SSPMeteoOled:
 
             # Line 2 - Rain
             line = ''
-            if val[4] > 0 or val[5] > 0:
-                if val[5] > 0:
-                    line = '{:.1f}mm/h {:.0f}mm'.format(val[5],val[4])
+            if val[6] > 0 or val[7] > 0:
+                if val[7] > 0:
+                    line = '{:.1f}mm/h {:.0f}mm'.format(val[7],val[6])
                     #~ status = '¡ LLUEVE !   '
                 else:
-                    line = 'Lluvia diaria {:.0f}mm'.format(val[4])
+                    line = 'Lluvia diaria {:.0f}mm'.format(val[6])
             draw.text((0, 28), line, 1, cls.font2)
 
             # Line 3 - Pressure and wind
-            line = '{:.0f}mb {:.0f}kph {:.0f}º'.format(val[3],val[6],val[8])
+            line = '{:.0f}mb {:.0f}kph {:.0f}º'.format(val[5],val[8],val[10])
             font = cls.font2
             draw.text((0, 40), line, 1, font)
 
             # Line 4 - Status
-            d, resto = divmod(val[9] * 5, 24 * 60)
+            d, resto = divmod(val[11] * 5, 24 * 60)
             h, m = divmod(resto, 60)
             line = '{} {}d{}:{}'.format(lval[0], int(d), int(h), int(m))
             draw.text((0, 52), line, 1, cls.font2)

@@ -48,7 +48,7 @@ def hello():
         datos = s.recv(256).decode().split(',')
         s.close()
         # Línea de estado
-        d, resto = divmod(int(datos[10]) * 5, 24 * 60)
+        d, resto = divmod(int(datos[12]) * 5, 24 * 60)
         h, m = divmod(resto, 60)
         uptime = ' Actividad: {}d {}h {}m'.format(int(d), int(h), int(m))
         datos[0] = 'Datos actualizados a las ' + datos[0] + uptime
