@@ -86,7 +86,7 @@ class MiTCPHandler(socketserver.BaseRequestHandler):
         req = self.request.recv(256).decode()
         if 'Q' in req:
             # Responde enviando el cambio de día
-            self.request.sendall(es_cambio_de_dia())
+            self.request.sendall(Datos.es_cambio_de_dia())
             # Procesa los datos en otro thread
             Datos.datos = req.replace('Q','')
             threading.Thread(target=procesar).start()
