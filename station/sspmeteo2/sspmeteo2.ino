@@ -44,7 +44,7 @@ unsigned long timer_lectura;
 int intervalo;
 
 // Control del cambio de dia
-char cambio_de_dia = 0;
+char cambio_de_dia = 'N';
 
 // watchdog y contadores de errores
 unsigned long watchdog;
@@ -313,7 +313,7 @@ void setup()
   pinMode(DHT22_PIN, INPUT_PULLUP);
   conectaInterrupts();
   dht.begin();
-  bme.begin(0x76))
+  bme.begin(0x76);
   intervalo = 0;
   timer_lectura = millis();
 }
@@ -339,11 +339,11 @@ void loop()
       comunicaPorWifi();
       conectaInterrupts();
       // Comprueba cambio de dia
-      if (cambio_de_dia)
+      if (cambio_de_dia == 'Y')
       {
         lluvia_ticks = 0;
         lluvia_ticks_ant = 0;
-        cambio_de_dia = 0;
+        cambio_de_dia = 'N';
       }
       // Reset de timer y valores de viento
       intervalo = 0;

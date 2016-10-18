@@ -27,20 +27,20 @@
 import os
 import socketserver
 import threading
-import request
+import requests
 from datetime import datetime
 
 class Datos:
     ahora = datetime.now()
-    datos = '0,0,0,0,0,0,0,0,0,0,0,0,0,0,0'
+    datos = '0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0'
 
     @classmethod
-    def es_cambio_de_dia(cls): #TODO comprobar cambio de dia  para el proximo intervalo ,estudiar esto
+    def es_cambio_de_dia(cls):
         este_momento = datetime.now()
         if este_momento.day != cls.ahora.day:
-            respuesta = b'\x01'
+            respuesta = b'Y'
         else:
-            respuesta = b'\x00'
+            respuesta = b'N'
         cls.ahora = este_momento
         return respuesta
 
@@ -54,15 +54,15 @@ class Datos:
         with open(fname, 'a') as f:
            f.write(cls.ahora.strftime('%c, ') + cls.datos + '\n')
 
-    @Classmethod
+    @classmethod
     def enviar_a_wunder(cls):
         url = 'https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php'
         try:
-            v = [float(x) for x in cls.datos.split(', ')]
+            v = [float(x) for x in cls.datos.split(',')]
             params = {  'action':       'updateraw',
                         'ID':           'ICOMUNID54',
                         'PASSWORD':     'laura11',
-                        'dateutc':      'now'
+                        'dateutc':      'now',
                         'tempf':        str(v[0] * 1.8 + 32),
                         'humidity':     str(v[2]),
                         'dewptf':       str(v[4] * 1.8 + 32),
@@ -75,8 +75,8 @@ class Datos:
             respuesta = requests.get(url, params = params)
         except:
             return
-
-
+            
+            
 def procesar():
     Datos.salvar()
     Datos.enviar_a_wunder()
@@ -88,7 +88,7 @@ class MiTCPHandler(socketserver.BaseRequestHandler):
             # Responde enviando el cambio de día
             self.request.sendall(Datos.es_cambio_de_dia())
             # Procesa los datos en otro thread
-            Datos.datos = req.replace('Q','')
+            Datos.datos = req[:req.find('Q')]
             threading.Thread(target=procesar).start()
         elif 'GET_DATOS' in req:
             self.request.sendall(Datos.datos.encode())
