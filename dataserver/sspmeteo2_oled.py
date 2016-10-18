@@ -27,6 +27,7 @@
 from oled.device import sh1106
 from oled.render import canvas
 from PIL import ImageDraw, ImageFont
+from datetime import datetime
 
 FONT_FILE0 = 'Roboto-BoldCondensed.ttf'
 FONT_FILE1 = 'wwDigital.ttf'
@@ -47,8 +48,7 @@ class SSPMeteoOled:
     @classmethod
     def update(cls, datos):
         try:
-            lval = datos.split(', ')
-            val = [float(x) for x in lval[1:]]     # Remove wemos date (lval[0])
+            val = [float(x) for x in datos.split(', ')]
         except:
             return
         with canvas(cls.oled) as draw:
@@ -78,7 +78,7 @@ class SSPMeteoOled:
             # Line 4 - Status
             d, resto = divmod(val[11] * 5, 24 * 60)
             h, m = divmod(resto, 60)
-            line = '{} {}d{}:{}'.format(lval[0], int(d), int(h), int(m))
+            line = '{} {}d{}:{}'.format(datetime.now().strftime('%H:%M:%S'), int(d), int(h), int(m))
             draw.text((0, 52), line, 1, cls.font2)
 
 if __name__ == "__main__":

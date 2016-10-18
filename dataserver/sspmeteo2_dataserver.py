@@ -26,37 +26,75 @@
 
 import os
 import socketserver
+import threading
+import request
 from datetime import datetime
-#~ from sspmeteo2_oled import SSPMeteoOled
 
 class Datos:
-
-    datos = '0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0'
+    ahora = datetime.now()
+    datos = '0,0,0,0,0,0,0,0,0,0,0,0,0,0,0'
 
     @classmethod
-    def salvaDatos(cls, datos):
-        cls.datos = datos
+    def es_cambio_de_dia(cls): #TODO comprobar cambio de dia  para el proximo intervalo ,estudiar esto
+        este_momento = datetime.now()
+        if este_momento.day != cls.ahora.day:
+            respuesta = b'\x01'
+        else:
+            respuesta = b'\x00'
+        cls.ahora = este_momento
+        return respuesta
+
+    @classmethod
+    def salvar(cls):
         # Forma la estructura de directorios para los datos
-        a = datetime.now()
-        data_dir = a.strftime('datos/%Y/%Y-%m/')
+        data_dir = cls.ahora.strftime('datos/%Y/%Y-%m/')
         if not os.path.exists(data_dir):
             os.makedirs(data_dir)
-        fname = data_dir + a.strftime('%Y-%m-%d.dat')
+        fname = data_dir + cls.ahora.strftime('%Y-%m-%d.dat')
         with open(fname, 'a') as f:
-           f.write(a.strftime('%c, ') + cls.datos + '\n')
+           f.write(cls.ahora.strftime('%c, ') + cls.datos + '\n')
+
+    @Classmethod
+    def enviar_a_wunder(cls):
+        url = 'https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php'
+        try:
+            v = [float(x) for x in cls.datos.split(', ')]
+            params = {  'action':       'updateraw',
+                        'ID':           'ICOMUNID54',
+                        'PASSWORD':     'laura11',
+                        'dateutc':      'now'
+                        'tempf':        str(v[0] * 1.8 + 32),
+                        'humidity':     str(v[2]),
+                        'dewptf':       str(v[4] * 1.8 + 32),
+                        'baromin':      str(v[5] * 0.0295299830714),
+                        'dailyrainin':  str(v[6] / 25.4),
+                        'rainin':       str(v[7] / 25.4),
+                        'windspeedmph': str(v[8] * 0.621371192),
+                        'windgustmph':  str(v[9] * 0.621371192),
+                        'winddir':      str(int(v[10])) }
+            respuesta = requests.get(url, params = params)
+        except:
+            return
+
+
+def procesar():
+    Datos.salvar()
+    Datos.enviar_a_wunder()
 
 class MiTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         req = self.request.recv(256).decode()
         if 'Q' in req:
-            datos = req.replace('Q','')
-            Datos.salvaDatos(datos)
-            #~ SSPMeteoOled.update(datos)
+            # Responde enviando el cambio de día
+            self.request.sendall(es_cambio_de_dia())
+            # Procesa los datos en otro thread
+            Datos.datos = req.replace('Q','')
+            threading.Thread(target=procesar).start()
         elif 'GET_DATOS' in req:
             self.request.sendall(Datos.datos.encode())
 
 if __name__ == "__main__":
-    #~ SSPMeteoOled.begin()
+    Datos.ahora = datetime.now()
     HOST, PORT = "", 1234
     server = socketserver.TCPServer((HOST, PORT), MiTCPHandler)
     server.serve_forever()
