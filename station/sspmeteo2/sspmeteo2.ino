@@ -38,13 +38,10 @@
 #define LLUVIA_FACTOR 0.138     // Por cada tick de mi pluviómetro. En mm.
 #define ALTITUD 20.0            // En mi casa. en metros.
 
-#define INTERVALO_BASE 30000    // (en milisegundos)
-#define NUM_INTERVALOS 10       // Número de intervalos base que pasan en cada lectura/trasmision de valores (Ej. 10 * 30s. = 5 min.)
+#define INTERVALO_BASE 30000L    // (en milisegundos)
+#define NUM_INTERVALOS 10L       // Número de intervalos base que pasan en cada lectura/trasmision de valores (Ej. 10 * 30s. = 5 min.)
 unsigned long timer_lectura;
 int intervalo;
-
-// Control del cambio de dia
-char cambio_de_dia = 'N';
 
 // watchdog y contadores de errores
 unsigned long watchdog;
@@ -70,11 +67,12 @@ float min_humi = 1000.0;
 float max_humi = -1000.0;
 
 // LLUVIA
-float lluvia_dia;                            // Lluvia diaria
-float lluvia_por_hora;                 // Acumulado de lluvia en ultimo intervalo
-volatile word lluvia_ticks = 0L;             // variables modified in callback must be volatile
+float lluvia_dia;                              // Lluvia diaria
+float lluvia_por_hora;                         // Acumulado de lluvia en ultimo intervalo
+volatile unsigned long lluvia_ticks = 0L;    // variables modified in callback must be volatile
 volatile unsigned long lluvia_last = 0UL;    // the last time the output pin was toggled
-word lluvia_ticks_ant = 0L;                  // Para la gestión de la lluvia ultimo intervalo
+unsigned long lluvia_ticks_ant = 0L;          // Para la gestión de la lluvia ultimo intervalo
+char reset_lluvia_dia = 'N';
 
 // ANEMOMETRO
 float vel_vent;                               // Velocidad del viento en km/h
@@ -223,10 +221,17 @@ void calcVeleta()
 
 void calcLluvia()
 {
-  lluvia_dia = lluvia_ticks * LLUVIA_FACTOR;
-  // Calculo lluvia/hora
-  lluvia_por_hora = (lluvia_ticks - lluvia_ticks_ant) * LLUVIA_FACTOR * 60.0 * 60.0 * 1000.0 / (INTERVALO_BASE * NUM_INTERVALOS);
-  lluvia_ticks_ant = lluvia_ticks;
+    float delta;
+    if (reset_lluvia_dia == 'Y')
+    {
+        lluvia_dia = 0.0;
+        reset_lluvia_dia = 'N';
+    }
+    delta = lluvia_ticks - lluvia_ticks_ant;
+    lluvia_dia += delta * LLUVIA_FACTOR;
+    // Calculo lluvia/hora
+    lluvia_por_hora = (delta * LLUVIA_FACTOR * 3600.0 * 1000.0) / (INTERVALO_BASE * NUM_INTERVALOS);
+    lluvia_ticks_ant = lluvia_ticks;
 }
 
 void comunicaPorWifi()
@@ -259,7 +264,7 @@ void comunicaPorWifi()
     }
     else
     {
-      String msg = String("");
+      String msg = String("I");
                    msg += temp;
       msg += ", "; msg += temp2;
       msg += ", "; msg += humi;
@@ -275,13 +280,13 @@ void comunicaPorWifi()
       msg += ", "; msg += conterr_wifi;
       msg += ", "; msg += conterr_server;
       msg += ", "; msg += (millis() - ini) / 1000.0;   // Duracion en segundos del acceso Wifi
-      msg += "Q";
+      msg += "F";
       cliente.print(msg);
       while (cliente.connected())
       {
         if (cliente.available())
         {
-            cambio_de_dia = cliente.read();
+            reset_lluvia_dia = cliente.read();
         }
       }
     }
@@ -338,13 +343,6 @@ void loop()
       watchdog++;
       comunicaPorWifi();
       conectaInterrupts();
-      // Comprueba cambio de dia
-      if (cambio_de_dia == 'Y')
-      {
-        lluvia_ticks = 0;
-        lluvia_ticks_ant = 0;
-        cambio_de_dia = 'N';
-      }
       // Reset de timer y valores de viento
       intervalo = 0;
       vel_vent = 0.0;

@@ -1,5 +1,5 @@
 """
-  sspmeteo2
+  sspmeteo3_dataserver.py
 
   The MIT License (MIT)
 
@@ -28,73 +28,110 @@ import os
 import socketserver
 import threading
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
+import time
+import json
 
-class Datos:
-    ahora = datetime.now()
-    datos = '0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0'
+class Arduino:
 
-    @classmethod
-    def es_cambio_de_dia(cls):
-        este_momento = datetime.now()
-        if este_momento.day != cls.ahora.day:
+    KEYS = ['temp', 'temp2', 'humi', 'humi2', 'troc', 'pres', 'llud', 'lluh', 'vven', 'vrac','dven', 'wdog', 'errwif', 'errser', 'durcic']
+
+    def __init__(self, periodo= 5):
+        self.periodo = periodo      # Periodo de comunicacion en minutos
+        self.hoy = datetime.now().day
+        self.sdatos = '0,0,0,0,0,0,0,0,0,0,0,0,0,0,0'
+        self.ddatos = {}
+
+    def es_cambio_de_dia(self):
+        dema = (datetime.now() + timedelta(minutes= self.periodo)).day
+        if dema != self.hoy:
             respuesta = b'Y'
         else:
             respuesta = b'N'
-        cls.ahora = este_momento
+        self.hoy = dema
         return respuesta
 
-    @classmethod
-    def salvar(cls):
+    def salvar(self):
         # Forma la estructura de directorios para los datos
-        data_dir = cls.ahora.strftime('datos/%Y/%Y-%m/')
+        ahora = datetime.now()
+        data_dir = ahora.strftime('datos/%Y/%Y-%m/')
         if not os.path.exists(data_dir):
             os.makedirs(data_dir)
-        fname = data_dir + cls.ahora.strftime('%Y-%m-%d.dat')
+        fname = data_dir + ahora.strftime('%Y-%m-%d.dat')
         with open(fname, 'a') as f:
-           f.write(cls.ahora.strftime('%c, ') + cls.datos + '\n')
+           f.write(ahora.strftime('%c') + self.sdatos + '\n')
 
-    @classmethod
-    def enviar_a_wunder(cls):
+    def enviar_a_wunder(self):
         url = 'https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php'
         try:
-            v = [float(x) for x in cls.datos.split(',')]
             params = {  'action':       'updateraw',
                         'ID':           'ICOMUNID54',
                         'PASSWORD':     'laura11',
                         'dateutc':      'now',
-                        'tempf':        str(v[0] * 1.8 + 32),
-                        'humidity':     str(v[2]),
-                        'dewptf':       str(v[4] * 1.8 + 32),
-                        'baromin':      str(v[5] * 0.0295299830714),
-                        'dailyrainin':  str(v[6] / 25.4),
-                        'rainin':       str(v[7] / 25.4),
-                        'windspeedmph': str(v[8] * 0.621371192),
-                        'windgustmph':  str(v[9] * 0.621371192),
-                        'winddir':      str(int(v[10])) }
+                        'tempf':        str(self.ddatos['temp'] * 1.8 + 32),
+                        'humidity':     str(self.ddatos['humi']),
+                        'dewptf':       str(self.ddatos['troc'] * 1.8 + 32),
+                        'baromin':      str(self.ddatos['pres'] * 0.0295299830714),
+                        'dailyrainin':  str(self.ddatos['llud'] / 25.4),
+                        'rainin':       str(self.ddatos['lluh'] / 25.4),
+                        'windspeedmph': str(self.ddatos['vven'] * 0.621371192),
+                        'windgustmph':  str(self.ddatos['vrac'] * 0.621371192),
+                        'winddir':      str(int(self.ddatos['dven'])) }
             respuesta = requests.get(url, params = params)
         except:
+            return False
+        return True
+
+    def procesar(self, respuesta):
+        saux = respuesta[1:-1]   # Quita 'I' inicial y 'F' final
+        try:
+            vals = [float(x) for x in saux.split(',')]
+        except:
+            print(datetime.now().strftime('%c'), 'Excepción en datos de la estación: No se pudo convertir a float', saux)
             return
-            
-            
-def procesar():
-    Datos.salvar()
-    Datos.enviar_a_wunder()
+        if len(vals) == len(Arduino.KEYS):
+            self.sdatos = saux
+            self.ddatos = dict(zip(Arduino.KEYS, vals))
+            #~ print(self.ddatos)      # PRUEBAS
+            self.salvar()
+            #~ self.enviar_a_wunder()      #PRUEBAS
+        else:
+            print(datetime.now().strftime('%c'), 'Error en datos de la estación: Faltan valores', saux)
+
+
+class MiServer(socketserver.TCPServer):
+    def __init__(self, server_address, req_handler_class, arduino):
+        socketserver.TCPServer.__init__(self, server_address, req_handler_class)
+        self.arduino = arduino
+
 
 class MiTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
-        req = self.request.recv(256).decode()
-        if 'Q' in req:
+        respuesta = ''
+        try:
+            respuesta = self.request.recv(256).decode()
+        except:
+            respuesta = ''
+        if len(respuesta) and respuesta[0] == 'I' and respuesta[-1] == 'F':
             # Responde enviando el cambio de día
-            self.request.sendall(Datos.es_cambio_de_dia())
+            self.request.sendall(self.server.arduino.es_cambio_de_dia())
             # Procesa los datos en otro thread
-            Datos.datos = req[:req.find('Q')]
-            threading.Thread(target=procesar).start()
-        elif 'GET_DATOS' in req:
-            self.request.sendall(Datos.datos.encode())
+            threading.Thread(target=self.server.arduino.procesar, args= (respuesta,)).start()
+        elif 'GET_DATOS' in respuesta:
+            self.request.sendall(self.server.arduino.sdatos.encode())
+        elif 'GET_JSON' in respuesta:
+            self.request.sendall(json.dumps(self.server.arduino.ddatos).encode())
+        else:
+            self.request.sendall('PERDON?'.encode())
+
 
 if __name__ == "__main__":
-    Datos.ahora = datetime.now()
-    HOST, PORT = "", 1234
-    server = socketserver.TCPServer((HOST, PORT), MiTCPHandler)
+    import locale
+    locale.setlocale(locale.LC_ALL, '')
+    # Comunicacion con el Arduino
+    arduino = Arduino(periodo= 1)
+    # Arranca el servidor de datos
+    HOST, PORT = "", 3069
+    server = MiServer((HOST, PORT), MiTCPHandler, arduino)
+    print(datetime.now().strftime('%c'), 'Info: Servidor arrancado')
     server.serve_forever()
