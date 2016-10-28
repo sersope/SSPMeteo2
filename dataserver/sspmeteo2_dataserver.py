@@ -31,8 +31,9 @@ import requests
 from datetime import datetime, timedelta
 import time
 import json
+from sspmeteo2_oled import SSPMeteoOled
 
-class Arduino:
+class Wemos:
 
     KEYS = ['temp', 'temp2', 'humi', 'humi2', 'troc', 'pres', 'llud', 'lluh', 'vven', 'vrac','dven', 'wdog', 'errwif', 'errser', 'durcic']
 
@@ -59,7 +60,7 @@ class Arduino:
             os.makedirs(data_dir)
         fname = data_dir + ahora.strftime('%Y-%m-%d.dat')
         with open(fname, 'a') as f:
-           f.write(ahora.strftime('%c') + self.sdatos + '\n')
+           f.write(ahora.strftime('%c,') + self.sdatos + '\n')
 
     def enviar_a_wunder(self):
         url = 'https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php'
@@ -78,7 +79,11 @@ class Arduino:
                         'windgustmph':  str(self.ddatos['vrac'] * 0.621371192),
                         'winddir':      str(int(self.ddatos['dven'])) }
             respuesta = requests.get(url, params = params)
+            if 'success' not in respuesta:
+                print(datetime.now().strftime('%c'), 'Datos no envíados a Wunder')
+                return False
         except:
+            print(datetime.now().strftime('%c'), 'Excepción en envío a Wunder')
             return False
         return True
 
@@ -89,20 +94,20 @@ class Arduino:
         except:
             print(datetime.now().strftime('%c'), 'Excepción en datos de la estación: No se pudo convertir a float', saux)
             return
-        if len(vals) == len(Arduino.KEYS):
+        if len(vals) == len(Wemos.KEYS):
             self.sdatos = saux
-            self.ddatos = dict(zip(Arduino.KEYS, vals))
-            #~ print(self.ddatos)      # PRUEBAS
+            self.ddatos = dict(zip(Wemos.KEYS, vals))
+            SSPMeteoOled.update(self.sdatos)
             self.salvar()
-            #~ self.enviar_a_wunder()      #PRUEBAS
+            self.enviar_a_wunder()
         else:
             print(datetime.now().strftime('%c'), 'Error en datos de la estación: Faltan valores', saux)
 
 
 class MiServer(socketserver.TCPServer):
-    def __init__(self, server_address, req_handler_class, arduino):
+    def __init__(self, server_address, req_handler_class, wemos):
         socketserver.TCPServer.__init__(self, server_address, req_handler_class)
-        self.arduino = arduino
+        self.wemos = wemos
 
 
 class MiTCPHandler(socketserver.BaseRequestHandler):
@@ -114,13 +119,13 @@ class MiTCPHandler(socketserver.BaseRequestHandler):
             respuesta = ''
         if len(respuesta) and respuesta[0] == 'I' and respuesta[-1] == 'F':
             # Responde enviando el cambio de día
-            self.request.sendall(self.server.arduino.es_cambio_de_dia())
+            self.request.sendall(self.server.wemos.es_cambio_de_dia())
             # Procesa los datos en otro thread
-            threading.Thread(target=self.server.arduino.procesar, args= (respuesta,)).start()
+            threading.Thread(target=self.server.wemos.procesar, args= (respuesta,)).start()
         elif 'GET_DATOS' in respuesta:
-            self.request.sendall(self.server.arduino.sdatos.encode())
+            self.request.sendall(self.server.wemos.sdatos.encode())
         elif 'GET_JSON' in respuesta:
-            self.request.sendall(json.dumps(self.server.arduino.ddatos).encode())
+            self.request.sendall(json.dumps(self.server.wemos.ddatos).encode())
         else:
             self.request.sendall('PERDON?'.encode())
 
@@ -128,10 +133,11 @@ class MiTCPHandler(socketserver.BaseRequestHandler):
 if __name__ == "__main__":
     import locale
     locale.setlocale(locale.LC_ALL, '')
-    # Comunicacion con el Arduino
-    arduino = Arduino(periodo= 1)
+    SSPMeteoOled.begin()
+    # Comunicacion con el Wemos
+    wemos = Wemos(periodo= 1)
     # Arranca el servidor de datos
     HOST, PORT = "", 3069
-    server = MiServer((HOST, PORT), MiTCPHandler, arduino)
+    server = MiServer((HOST, PORT), MiTCPHandler, wemos)
     print(datetime.now().strftime('%c'), 'Info: Servidor arrancado')
     server.serve_forever()

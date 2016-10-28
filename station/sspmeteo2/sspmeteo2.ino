@@ -244,24 +244,17 @@ void comunicaPorWifi()
   IPAddress dns1(8,8,8,8);
   IPAddress dns2(8,8,4,4);
   const char * servidor = "192.168.1.10";
-  const uint16_t puerto = 1234;
-
-  float ini;
-
-  ini = millis();
+  const uint16_t puerto = 3069;
+  float ini = millis();
   WiFi.config(staticIP, gateway, subnet, dns1, dns2);
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED)
-  {
     delay(1);
-  }
   if (WiFi.status() == WL_CONNECTED)
   {
     WiFiClient cliente;
     if (!cliente.connect(servidor, puerto))
-    {
       conterr_server++;
-    }
     else
     {
       String msg = String("I");
@@ -283,19 +276,13 @@ void comunicaPorWifi()
       msg += "F";
       cliente.print(msg);
       while (cliente.connected())
-      {
         if (cliente.available())
-        {
             reset_lluvia_dia = cliente.read();
-        }
-      }
     }
     cliente.stop();
   }
   else
-  {
     conterr_wifi++;
-  }
   WiFi.disconnect();
 }
 

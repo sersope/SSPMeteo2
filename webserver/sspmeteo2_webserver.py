@@ -30,7 +30,7 @@ import sys, getopt
 from datetime import datetime
 
 data_server = 'localhost'
-data_server_port = 1234
+data_server_port = 3069
 web_server_port = 8080
 
 # Rutas del servidor
