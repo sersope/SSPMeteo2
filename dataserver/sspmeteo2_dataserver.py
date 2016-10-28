@@ -79,7 +79,7 @@ class Wemos:
                         'windgustmph':  str(self.ddatos['vrac'] * 0.621371192),
                         'winddir':      str(int(self.ddatos['dven'])) }
             respuesta = requests.get(url, params = params)
-            if 'success' not in respuesta:
+            if 'success' not in respuesta.text:
                 print(datetime.now().strftime('%c'), 'Datos no envíados a Wunder')
                 return False
         except:
