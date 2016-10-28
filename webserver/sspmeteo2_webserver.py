@@ -27,9 +27,10 @@
 from bottle import route, run, template, static_file
 import socket
 import sys, getopt
+from datetime import datetime
 
 data_server = 'localhost'
-data_server_port = 1234
+data_server_port = 3069
 web_server_port = 8080
 
 # Rutas del servidor
@@ -39,8 +40,8 @@ def send_static(filename):
 
 @route('/sspmeteo2')
 def hello():
-    datos = ['0' for i in range(16)]
-    datos[4] = '950'
+    datos = ['0' for i in range(15)]
+    status = ''
     try:
         s = socket.socket()
         s.connect((data_server, data_server_port))
@@ -48,13 +49,13 @@ def hello():
         datos = s.recv(256).decode().split(',')
         s.close()
         # Línea de estado
-        d, resto = divmod(int(datos[12]) * 5, 24 * 60)
+        d, resto = divmod(int(datos[11]) * 5, 24 * 60)
         h, m = divmod(resto, 60)
         uptime = ' Actividad: {}d {}h {}m'.format(int(d), int(h), int(m))
-        datos[0] = 'Datos actualizados a las ' + datos[0] + uptime
+        status = 'Datos actualizados a las ' + datetime.now().strftime('%H:%M:%S') + uptime
     except:
-        datos[0]= "ERROR en el acceso al servidor de datos."
-    return template('sspmeteo2', datos=datos)
+        status= "ERROR en el acceso al servidor de datos."
+    return template('sspmeteo2', datos=datos, status=status)
 
 
 # Parse argumentos de linea de comandos
