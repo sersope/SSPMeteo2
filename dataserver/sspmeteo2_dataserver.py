@@ -80,10 +80,10 @@ class Wemos:
                         'winddir':      str(int(self.ddatos['dven'])) }
             respuesta = requests.get(url, params = params)
             if 'success' not in respuesta.text:
-                print(datetime.now().strftime('%c'), 'Datos no envíados a Wunder')
+                print(datetime.now().strftime('%c'), 'Aviso: Datos no recibidos en Wunder.')
                 return False
         except:
-            print(datetime.now().strftime('%c'), 'Excepción en envío a Wunder')
+            print(datetime.now().strftime('%c'), 'Excepción: Error en envío a Wunder.')
             return False
         return True
 
@@ -92,7 +92,7 @@ class Wemos:
         try:
             vals = [float(x) for x in saux.split(',')]
         except:
-            print(datetime.now().strftime('%c'), 'Excepción en datos de la estación: No se pudo convertir a float', saux)
+            print(datetime.now().strftime('%c'), 'Excepción: Valores recibidos de Wmos no se pudieron convertir a float.', saux)
             return
         if len(vals) == len(Wemos.KEYS):
             self.sdatos = saux
@@ -101,7 +101,7 @@ class Wemos:
             self.salvar()
             self.enviar_a_wunder()
         else:
-            print(datetime.now().strftime('%c'), 'Error en datos de la estación: Faltan valores', saux)
+            print(datetime.now().strftime('%c'), 'Aviso: En datos recibidos de la estación faltan valores.', saux)
 
 
 class MiServer(socketserver.TCPServer):
@@ -116,6 +116,7 @@ class MiTCPHandler(socketserver.BaseRequestHandler):
         try:
             respuesta = self.request.recv(256).decode()
         except:
+            print(datetime.now().strftime('%c'), 'Excepción: Fallo al recibir de cliente.')
             respuesta = ''
         if len(respuesta) and respuesta[0] == 'I' and respuesta[-1] == 'F':
             # Responde enviando el cambio de día
@@ -127,7 +128,8 @@ class MiTCPHandler(socketserver.BaseRequestHandler):
         elif 'GET_JSON' in respuesta:
             self.request.sendall(json.dumps(self.server.wemos.ddatos).encode())
         else:
-            self.request.sendall('PERDON?'.encode())
+            self.request.sendall('PERDON?'.encode)
+            print(datetime.now().strftime('%c'), 'Aviso: Recibida respuesta incorrecta desde cliente.', respuesta)
 
 
 if __name__ == "__main__":
@@ -139,5 +141,5 @@ if __name__ == "__main__":
     # Arranca el servidor de datos
     HOST, PORT = "", 3069
     server = MiServer((HOST, PORT), MiTCPHandler, wemos)
-    print(datetime.now().strftime('%c'), 'Info: Servidor arrancado')
+    print(datetime.now().strftime('%c'), 'Info: Servidor arrancado.')
     server.serve_forever()
