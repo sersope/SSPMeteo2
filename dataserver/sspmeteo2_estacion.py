@@ -135,7 +135,7 @@ class Estacion:
             es_minuto_clave = minuto != minuto_ant and minuto % self.periodo == 0
             if self.datos_disponibles and es_minuto_clave:
                 if self.oled is not None:
-                    self.oled.update(self.sdatos)
+                    self.oled.update(self.ddatos)
                 self.salvar_datos()
                 self.enviar_datos_a_wunder()
             minuto_ant = minuto

@@ -46,14 +46,12 @@ class SSPMeteoOled:
             draw.text((0, 50), 'Esperando datos...', 1, cls.font2)
 
     @classmethod
-    def update(cls, datos):
-        try:
-            val = [float(x) for x in datos.split(', ')]
-        except:
-            return
+    def update(cls, ddatos):
+        for k, v in ddatos.items():
+            ddatos[k] = float(v)
         with canvas(cls.oled) as draw:
             # Line 1 - Temp. and humidity
-            line = '{:.1f}º {:.0f}%'.format(val[0],val[2])
+            line = '{:.1f}º {:.0f}%'.format(ddatos['temp'], ddatos['humi'])
             font = cls.font0
             if draw.textsize(line, font)[0] > cls.oled.width:
                 font = cls.font1
@@ -62,21 +60,21 @@ class SSPMeteoOled:
 
             # Line 2 - Rain
             line = ''
-            if val[6] > 0 or val[7] > 0:
-                if val[7] > 0:
-                    line = '{:.1f}mm/h {:.0f}mm'.format(val[7],val[6])
+            if ddatos['llud'] > 0 or ddatos['lluh'] > 0:
+                if ddatos['lluh'] > 0:
+                    line = '{:.1f}mm/h {:.0f}mm'.format(ddatos['lluh'], ddatos['llud'])
                     #~ status = '¡ LLUEVE !   '
                 else:
-                    line = 'Lluvia diaria {:.0f}mm'.format(val[6])
+                    line = 'Lluvia diaria {:.0f}mm'.format(ddatos['llud'])
             draw.text((0, 28), line, 1, cls.font2)
 
             # Line 3 - Pressure and wind
-            line = '{:.0f}mb {:.0f}kph {:.0f}º'.format(val[5],val[8],val[10])
+            line = '{:.0f}mb {:.0f}kph {:.0f}º'.format(ddatos['pres'], ddatos['vven'], ddatos['dven'])
             font = cls.font2
             draw.text((0, 40), line, 1, font)
 
             # Line 4 - Status
-            d, resto = divmod(val[11] * 5, 24 * 60)
+            d, resto = divmod(ddatos['wdog'] * 5, 24 * 60)
             h, m = divmod(resto, 60)
             line = '{} {}d{}:{}'.format(datetime.now().strftime('%H:%M:%S'), int(d), int(h), int(m))
             draw.text((0, 52), line, 1, cls.font2)
