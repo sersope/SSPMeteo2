@@ -45,6 +45,19 @@ def principal():
     status = 'Datos actualizados a las ' + datetime.now().strftime('%H:%M:%S') + uptime
     return template('sspmeteo2', datos=estacion.ddatos, status=status)
 
+@route('/sspmeteo2/<year>/<mes>/<dia>')
+def datos_diarios(year, mes, dia):
+    filename = year + '-' + mes + '-' + dia + '.dat'
+    root = './datos/{0}/{0}-{1}'.format(year,mes)
+    return static_file(filename, root=root)
+
+@route('/sspmeteo2/log')
+def log():
+    return static_file('sspmeteo2.log', root='.')
+
+@route('/sspmeteo2/datos')
+def datos():
+    return estacion.ddatos
 
 locale.setlocale(locale.LC_ALL, '')
 logging.basicConfig(filename='sspmeteo2.log', level=logging.INFO,format='%(asctime)s - %(levelname)s - %(message)s',datefmt='%c')
