@@ -35,7 +35,7 @@
             renderTo: 'temperatura', width: ancho, height: alto, units: "°C", title: 'Temperatura',
             minValue: -20, maxValue: 60, majorTicks: ["-20","-10","0","10","20","30","40","50","60"], highlights: false,
             animateOnInit: true, colorTitle:"#444444", colorUnits:"#444444", borders:false,
-            value:{{datos[0]}}
+            value:{{datos['temp']}}
         }).draw();
         //~ Humedad
         var gauge_humedad = new RadialGauge({
@@ -43,7 +43,7 @@
             width: ancho, title: 'Humedad', height: alto, units: '%', colorTitle:"#444444", colorUnits:"#444444",
             minValue: 0, maxValue: 100, majorTicks: [0,10,20,30,40,50,60,70,80,90,100], highlights: false,
             animationRule: "linear", animateOnInit: true, animationDuration: 1500, borders:false,
-            value:{{datos[2]}}
+            value:{{datos['humi']}}
         }).draw();
         //~ Presion
         var gauge_presion = new RadialGauge({
@@ -51,7 +51,7 @@
             width: ancho, title: 'Presión', height: alto, units: 'mbar', colorTitle:"#444444", colorUnits:"#444444",
             minValue: 950, maxValue: 1050, majorTicks: [950,960,970,980,990,1000,1010,1020,1030,1040,1050], highlights: false,
             animationRule: "linear", animateOnInit: true, animationDuration: 1500, borders:false,
-            value:{{datos[5]}}
+            value:{{datos['pres']}}
         }).draw();
         //~ Viento
         var gauge_dir_vent = new RadialGauge({
@@ -59,7 +59,7 @@
             width: ancho, height: alto, minValue: 0, maxValue: 360, colorTitle:"#444444", colorUnits:"#444444", strokeTicks: false, highlights: false,
             majorTicks: ["N","NE","E","SE","S","SW","W","NW","N"], minorTicks: 2, ticksAngle: 360, startAngle: 180,
             valueBox: false, title: 'Dir. viento', animationRule: "elastic", animateOnInit: true, animationDuration: 1500, borders:false,
-            value:{{datos[10]}}
+            value:{{datos['dven']}}
         }).draw();
         var gauge = new RadialGauge({
             renderTo: 'vel_vent',
@@ -67,7 +67,7 @@
             majorTicks: [ "0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100", "110", "120", "130", "140"],
             strokeTicks: true, highlights:false, borders:false, colorTitle:"#444444", colorUnits:"#444444",
             animationDuration: 1500, animationRule: "linear", animationOnInit: true,
-            value:{{datos[8]}}
+            value:{{datos['vven']}}
         }).draw();
         var gauge = new RadialGauge({
             renderTo: 'rac_vent',
@@ -75,7 +75,7 @@
             majorTicks: [ "0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100", "110", "120", "130", "140"],
             strokeTicks: true, highlights:false, borders:false, colorTitle:"#444444", colorUnits:"#444444",
             animationDuration: 1500, animationRule: "linear", animationOnInit: true,
-            value:{{datos[9]}}
+            value:{{datos['vrac']}}
         }).draw();
         // Lluvia
         var gauge = new RadialGauge({
@@ -84,14 +84,14 @@
             majorTicks: [ "0", "10", "20", "30", "40", "50", "60"], colorTitle:"#444444", colorUnits:"#444444",
             strokeTicks: true, highlights:false, borders:false,
             animationDuration: 1500, animationRule: "linear", animationOnInit: true,
-             value:{{datos[7]}}
+             value:{{datos['lluh']}}
        }).draw();
         var gauge_humedad = new RadialGauge({
             renderTo: "lluvia_dia",
             width: ancho, title: 'Lluvia diaria', height: alto, units: 'mm', colorTitle:"#444444", colorUnits:"#444444",
             minValue: 0, maxValue: 100, majorTicks: [0,10,20,30,40,50,60,70,80,90,100], highlights: false,
             animationRule: "linear", animateOnInit: true, animationDuration: 1500, borders:false,
-            value:{{datos[6]}}
+            value:{{datos['llud']}}
         }).draw();
     </script>
 </body>

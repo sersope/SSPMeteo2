@@ -30,14 +30,20 @@ import threading
 import time
 import socket
 from datetime import datetime, timedelta
+import logging
+
+oled = True
+try:
+    from sspmeteo2_oled import SSPMeteoOled
+except:
+    oled = False
 
 class Estacion:
 
     KEYS = ['temp', 'temp2', 'humi', 'humi2', 'troc', 'pres', 'llud', 'lluh', 'vven', 'vrac','dven', 'wdog', 'errwif', 'errser', 'durcic']
 
-    def __init__(self, periodo= 5, oled= None):
+    def __init__(self, periodo= 5):
         self.periodo = periodo      # Periodo de comunicacion en minutos de la estacion
-        self.oled = oled            # Indica si hay conectada pantallita OLED (para Raspi)
         self.hoy = datetime.now().day
         # Inicializacion de datos
         lceros = ['0' for k in Estacion.KEYS]
@@ -45,8 +51,10 @@ class Estacion:
         self.ddatos = dict(zip(Estacion.KEYS, lceros))
         self.datos_disponibles= False
         # Pantalla Oled
-        if self.oled is not None:
-            self.oled.begin()
+        if oled:
+            SSPMeteoOled.begin()
+        else:
+            logging.info('Sin pantalla OLED.')
 
     def es_cambio_de_dia(self):
         dema = (datetime.now() + timedelta(minutes= self.periodo)).day
@@ -93,8 +101,7 @@ class Estacion:
         return True
 
     def run(self):
-        # Lanza el temporizador
-        threading.Thread(target= self.temporizador).start()
+        threading.Thread(target= self.run_minutero).start()
         try:
             server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             server.bind(('', 3069))
@@ -102,7 +109,7 @@ class Estacion:
         except OSError:
             logging.exception('Excepción al arrancar la estación')
         else:
-            logging.info('Estación arrancada.')
+            logging.info('Estación a la escuha...')
             while True:
                 mensaje = ''
                 error_datos = True
@@ -112,12 +119,14 @@ class Estacion:
                 except OSError:
                     logging.exception('Excepción al recibir de la estación.')
                 else:
-                    if len(mensaje) and mensaje[0] == 'I' and mensaje[-1] == 'F':
-                        cliente.sendall(self.es_cambio_de_dia())
-                        # Quita todo lo que no sean numeros (decimal o exponencial) y comas
-                        self.sdatos = ''.join(c for c in mensaje if c in '0123456789.,+-e')
-                        lval = self.sdatos.split(',')
+                    # Quita todo lo que no sean numeros (decimal o exponencial), comas y caracteres I y F
+                    sval = ''.join(c for c in mensaje if c in 'IF0123456789.,+-e')
+                    if len(sval) and sval[0]=='I' and sval[-1] == 'F':
+                        sval = sval[1:-1]
+                        lval = sval.split(',')
                         if len(lval) == len(Estacion.KEYS):
+                            cliente.sendall(self.es_cambio_de_dia())
+                            self.sdatos = sval
                             self.ddatos = dict(zip(Estacion.KEYS, lval))
                             error_datos = False
                             self.datos_disponibles = True
@@ -127,15 +136,15 @@ class Estacion:
             server.close()
             logging.info('Estación cerrada.')
 
-    def temporizador(self):
-        logging.info('Lanzado el temporizador.')
+    def run_minutero(self):
+        logging.info('Temporizador arrancado.')
         minuto_ant = datetime.now().minute
         while True:
             minuto = datetime.now().minute
             es_minuto_clave = minuto != minuto_ant and minuto % self.periodo == 0
             if self.datos_disponibles and es_minuto_clave:
-                if self.oled is not None:
-                    self.oled.update(self.ddatos)
+                if oled:
+                    SSPMeteoOled.update(self.ddatos)
                 self.salvar_datos()
                 self.enviar_datos_a_wunder()
             minuto_ant = minuto
@@ -147,8 +156,4 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(filename='sspmeteo2.log', level=logging.INFO,format='%(asctime)s - %(levelname)s - %(message)s',datefmt='%c')
     # Comunicacion con el Wemos
-    Oled = None
-    if len(sys.argv) > 1 and 'OLED' in sys.argv[1]:
-        from sspmeteo2_oled import SSPMeteoOled
-        Oled =  SSPMeteoOled
-    Estacion(oled= Oled).run()
+    Estacion().run()
