@@ -39,7 +39,7 @@ def send_static(filename):
 @route('/sspmeteo2')
 def principal():
     # Línea de estado
-    d, resto = divmod(int(float(estacion.ddatos['wdog'])) * estacion.periodo, 24 * 60)
+    d, resto = divmod(int(float(estacion.ddatos['uptime'])) * estacion.periodo, 24 * 60)
     h, m = divmod(resto, 60)
     uptime = ' Actividad: {}d {}h {}m'.format(int(d), int(h), int(m))
     status = 'Datos actualizados a las ' + datetime.now().strftime('%H:%M:%S') + uptime

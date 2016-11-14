@@ -40,11 +40,13 @@ except:
 
 class Estacion:
 
-    KEYS = ['temp', 'temp2', 'humi', 'humi2', 'troc', 'pres', 'llud', 'lluh', 'vven', 'vrac','dven', 'wdog', 'errwif', 'errser', 'durcic']
+    KEYS = ['temp', 'temp2', 'humi', 'humi2', 'troc', 'pres', 'llud', 'lluh', 'vven', 'vrac','dven', 'uptime', 'errwif', 'errser', 'durcic']
 
     def __init__(self, periodo= 5):
-        self.periodo = periodo      # Periodo de comunicacion en minutos de la estacion
+        self.periodo = periodo          # Periodo de comunicacion en minutos de la estacion
         self.hoy = datetime.now().day
+        self.watchdog = 0               # Vigila que la estación esté activa
+        self.uptime_ant = 0
         # Inicializacion de datos
         lceros = ['0' for k in Estacion.KEYS]
         self.sdatos = ','.join(lceros)
@@ -109,7 +111,7 @@ class Estacion:
         except OSError:
             logging.exception('Excepción al arrancar la estación')
         else:
-            logging.info('Estación a la escuha...')
+            logging.info('Preparado para recibir datos...')
             while True:
                 mensaje = ''
                 error_datos = True
@@ -137,7 +139,7 @@ class Estacion:
             logging.info('Estación cerrada.')
 
     def run_minutero(self):
-        logging.info('Temporizador arrancado.')
+        logging.info('Temporizador minutero arrancado.')
         minuto_ant = datetime.now().minute
         while True:
             minuto = datetime.now().minute
@@ -147,8 +149,16 @@ class Estacion:
                     SSPMeteoOled.update(self.ddatos)
                 self.salvar_datos()
                 self.enviar_datos_a_wunder()
+                # Control watchdog de la estación
+                if self.ddatos['uptime'] == self.uptime_ant:
+                    self.watchdog += 1
+                else
+                    self.watchdog = 0
+                if self.watchdog > 5:
+                    logging.warning('No se reciben datos de la estación.')
+                self.uptime_ant = self.ddatos['uptime']
             minuto_ant = minuto
-            time.sleep(0.3)
+            time.sleep(0.5)
 
 if __name__ == "__main__":
     import locale
