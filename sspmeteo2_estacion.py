@@ -59,7 +59,7 @@ class Estacion:
             logging.info('Sin pantalla OLED.')
 
     def es_cambio_de_dia(self):
-        dema = (datetime.now() + timedelta(minutes= self.periodo)).day
+        dema = (datetime.now() + timedelta(minutes= 2 * self.periodo)).day
         if dema != self.hoy:
             respuesta = b'Y'
         else:
