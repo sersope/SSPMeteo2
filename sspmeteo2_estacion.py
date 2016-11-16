@@ -156,7 +156,7 @@ class Estacion:
                 # Control watchdog de la estación
                 if self.ddatos['uptime'] == self.uptime_ant:
                     self.watchdog += 1
-                else
+                else:
                     self.watchdog = 0
                 if self.watchdog > 5:
                     logging.warning('No se reciben datos de la estación.')
