@@ -129,7 +129,11 @@ class Estacion:
                         if len(lval) == len(Estacion.KEYS):
                             cliente.sendall(self.es_cambio_de_dia())
                             self.sdatos = sval
-                            self.ddatos = dict(zip(Estacion.KEYS, lval))
+                            nuevos_datos = dict(zip(Estacion.KEYS, lval))
+                            dif_uptime = int(nuevos_datos['uptime']) - int(self.ddatos['uptime'])
+                            if self.datos_disponibles and dif_uptime > 1:
+                                logging.warning('Se perdieron %s mensaje(s) anteriore(s).', str(dif_uptime - 1))
+                            self.ddatos = nuevos_datos
                             error_datos = False
                             self.datos_disponibles = True
                     if error_datos:
