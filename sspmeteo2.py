@@ -49,11 +49,11 @@ def principal():
 def datos_diarios(year, mes, dia):
     filename = year + '-' + mes + '-' + dia + '.dat'
     root = './datos/{0}/{0}-{1}'.format(year,mes)
-    return static_file(filename, root=root)
+    return static_file(filename, root=root, mimetype= 'text/plain')
 
 @route('/sspmeteo2/log')
 def log():
-    return static_file('sspmeteo2.log', root='.')
+    return static_file('sspmeteo2.log', root='.', mimetype= 'text/plain')
 
 @route('/sspmeteo2/datos')
 def datos():
