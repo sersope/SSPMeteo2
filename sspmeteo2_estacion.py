@@ -134,6 +134,7 @@ class Estacion:
                             if self.datos_disponibles and dif_uptime > 1:
                                 logging.warning('Se perdieron %s mensaje(s) anteriore(s).', str(dif_uptime - 1))
                             self.ddatos = nuevos_datos
+                            self.salvar_datos()
                             error_datos = False
                             self.datos_disponibles = True
                     if error_datos:
@@ -151,7 +152,6 @@ class Estacion:
             if self.datos_disponibles and es_minuto_clave:
                 if oled:
                     SSPMeteoOled.update(self.ddatos)
-                self.salvar_datos()
                 self.enviar_datos_a_wunder()
                 # Control watchdog de la estación
                 if self.ddatos['uptime'] == self.uptime_ant:
