@@ -93,7 +93,9 @@ class Estacion:
                         'windspeedmph': str(float(self.ddatos['vven']) * 0.621371192),
                         'windgustmph':  str(float(self.ddatos['vrac']) * 0.621371192),
                         'winddir':      str(self.ddatos['dven']) }
+            logging.disable(logging.INFO)
             respuesta = requests.get(url, params = params)
+            logging.disable(logging.NOTSET)
             if 'success' not in respuesta.text:
                 logging.warning('Datos no recibidos en Wunder.')
                 return False
