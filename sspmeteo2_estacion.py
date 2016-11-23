@@ -28,6 +28,7 @@ import sys
 import requests
 import threading
 import time
+import select
 import socket
 from datetime import datetime, timedelta
 import logging
@@ -109,7 +110,7 @@ class Estacion:
         try:
             server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             server.bind(('', 3069))
-            server.listen(1)
+            server.listen(5)
         except OSError:
             logging.exception('Excepción al arrancar la estación')
         else:
@@ -117,31 +118,35 @@ class Estacion:
             while True:
                 mensaje = ''
                 error_datos = True
-                try:
-                    cliente,address = server.accept()
-                    mensaje = cliente.recv(1024).decode()
-                except OSError:
-                    logging.exception('Excepción al recibir de la estación.')
-                else:
-                    # Quita todo lo que no sean numeros (decimal o exponencial), comas y caracteres I y F
-                    sval = ''.join(c for c in mensaje if c in 'IF0123456789.,+-e')
-                    if len(sval) and sval[0]=='I' and sval[-1] == 'F':
-                        sval = sval[1:-1]
-                        lval = sval.split(',')
-                        if len(lval) == len(Estacion.KEYS):
-                            cliente.sendall(self.es_cambio_de_dia())
-                            self.sdatos = sval
-                            nuevos_datos = dict(zip(Estacion.KEYS, lval))
-                            dif_uptime = int(nuevos_datos['uptime']) - int(self.ddatos['uptime'])
-                            if self.datos_disponibles and dif_uptime > 1:
-                                logging.warning('Se perdieron %s mensaje(s) anteriore(s).', str(dif_uptime - 1))
-                            self.ddatos = nuevos_datos
-                            self.salvar_datos()
-                            error_datos = False
-                            self.datos_disponibles = True
-                    if error_datos:
-                        logging.warning('Recibido mensaje incorrecto desde estación: %s', mensaje)
-                cliente.close()
+                entrada_ready,output_ready,except_ready = select.select([server],[],[])
+                for entrada in entrada_ready:
+                    # handle the server socket
+                    if entrada == server:
+                        try:
+                            cliente,address = server.accept()
+                            mensaje = cliente.recv(1024).decode()
+                        except OSError:
+                            logging.exception('Excepción al recibir de la estación.')
+                        else:
+                            # Quita todo lo que no sean numeros (decimal o exponencial), comas y caracteres I y F
+                            sval = ''.join(c for c in mensaje if c in 'IF0123456789.,+-e')
+                            if len(sval) and sval[0]=='I' and sval[-1] == 'F':
+                                sval = sval[1:-1]
+                                lval = sval.split(',')
+                                if len(lval) == len(Estacion.KEYS):
+                                    cliente.sendall(self.es_cambio_de_dia())
+                                    self.sdatos = sval
+                                    nuevos_datos = dict(zip(Estacion.KEYS, lval))
+                                    dif_uptime = int(nuevos_datos['uptime']) - int(self.ddatos['uptime'])
+                                    if self.datos_disponibles and dif_uptime > 1:
+                                        logging.warning('Se perdieron %s mensaje(s) anteriore(s).', str(dif_uptime - 1))
+                                    self.ddatos = nuevos_datos
+                                    self.salvar_datos()
+                                    error_datos = False
+                                    self.datos_disponibles = True
+                            if error_datos:
+                                logging.warning('Recibido mensaje incorrecto desde estación: %s', mensaje)
+                        cliente.close()
             server.close()
             logging.info('Estación cerrada.')
 
