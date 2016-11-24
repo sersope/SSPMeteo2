@@ -39,7 +39,7 @@ def send_static(filename):
 @route('/sspmeteo2')
 def principal():
     # Línea de estado
-    d, resto = divmod(int(float(estacion.ddatos['uptime'])) * estacion.periodo, 24 * 60)
+    d, resto = divmod(int(estacion.ciclos) * estacion.periodo, 24 * 60)
     h, m = divmod(resto, 60)
     uptime = ' Actividad: {}d {}h {}m'.format(int(d), int(h), int(m))
     status = 'Datos actualizados a las ' + datetime.now().strftime('%H:%M:%S') + uptime
@@ -61,7 +61,7 @@ def datos():
 
 locale.setlocale(locale.LC_ALL, '')
 logging.basicConfig(filename='sspmeteo2.log', level=logging.INFO,format='%(asctime)s - %(levelname)s - %(message)s',datefmt='%c')
-logging.info('Iniciando sspmeteo2...')
+logging.info('----------------------- Iniciando sspmeteo2... -----------------------')
 # Arranca la estacion
 estacion = Estacion()
 threading.Thread(target= estacion.run).start()

@@ -24,13 +24,10 @@
   SOFTWARE.
 """
 import os
-import sys
 import requests
-import threading
 import time
-import select
-import socket
-from datetime import datetime, timedelta
+import serial
+from datetime import datetime
 import logging
 
 oled = True
@@ -41,26 +38,33 @@ except:
 
 class Estacion:
 
-    KEYS = ['temp', 'temp2', 'humi', 'humi2', 'troc', 'pres', 'llud', 'lluh', 'vven', 'vrac','dven', 'uptime', 'errwif', 'errser', 'durcic']
+    KEYS = ['temp', 'temp2', 'humi', 'humi2', 'troc', 'pres', 'llud', 'lluh', 'vven', 'vrac', 'dven', 'ciclos']
 
-    def __init__(self, periodo= 5):
+    def __init__(self, port= '/dev/ttyUSB0', periodo= 5):
+        self.port = port
         self.periodo = periodo          # Periodo de comunicacion en minutos de la estacion
         self.hoy = datetime.now().day
-        self.watchdog = 0               # Vigila que la estación esté activa
-        self.uptime_ant = 0
+        self.ciclos = 0.0               # Uptime estacion = ciclos * periodo (en minutos)
+        self.serial = None
         # Inicializacion de datos
         lceros = ['0' for k in Estacion.KEYS]
         self.sdatos = ','.join(lceros)
         self.ddatos = dict(zip(Estacion.KEYS, lceros))
-        self.datos_disponibles= False
         # Pantalla Oled
         if oled:
             SSPMeteoOled.begin()
         else:
             logging.info('Sin pantalla OLED.')
+        # Inicia serial
+        try:
+            self.serial = serial.Serial(self.port, 115200, timeout= 2)
+        except:
+            print(datetime.now().strftime('%c'), 'Excepción: No se pudo abrir el puerto con la estación.')
+            self.serial = None
 
     def es_cambio_de_dia(self):
-        dema = (datetime.now() + timedelta(minutes= 2 * self.periodo)).day
+        # TODO: Revisar esto
+        dema = datetime.now().day
         if dema != self.hoy:
             respuesta = b'Y'
         else:
@@ -105,71 +109,42 @@ class Estacion:
             return False
         return True
 
-    def run(self):
-        threading.Thread(target= self.run_minutero).start()
-        try:
-            server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-            server.bind(('', 3069))
-            server.listen(5)
-        except OSError:
-            logging.exception('Excepción al arrancar la estación')
-        else:
-            logging.info('Preparado para recibir datos...')
-            while True:
-                mensaje = ''
-                error_datos = True
-                entrada_ready,output_ready,except_ready = select.select([server],[],[])
-                for entrada in entrada_ready:
-                    # handle the server socket
-                    if entrada == server:
-                        try:
-                            cliente,address = server.accept()
-                            mensaje = cliente.recv(1024).decode()
-                        except OSError:
-                            logging.exception('Excepción al recibir de la estación.')
-                        else:
-                            # Quita todo lo que no sean numeros (decimal o exponencial), comas y caracteres I y F
-                            sval = ''.join(c for c in mensaje if c in 'IF0123456789.,+-e')
-                            if len(sval) and sval[0]=='I' and sval[-1] == 'F':
-                                sval = sval[1:-1]
-                                lval = sval.split(',')
-                                if len(lval) == len(Estacion.KEYS):
-                                    cliente.sendall(self.es_cambio_de_dia())
-                                    self.sdatos = sval
-                                    nuevos_datos = dict(zip(Estacion.KEYS, lval))
-                                    dif_uptime = int(nuevos_datos['uptime']) - int(self.ddatos['uptime'])
-                                    if self.datos_disponibles and dif_uptime > 1:
-                                        logging.warning('Se perdieron %s mensaje(s) anteriore(s).', str(dif_uptime - 1))
-                                    self.ddatos = nuevos_datos
-                                    self.salvar_datos()
-                                    error_datos = False
-                                    self.datos_disponibles = True
-                            if error_datos:
-                                logging.warning('Recibido mensaje incorrecto desde estación: %s', mensaje)
-                        cliente.close()
-            server.close()
-            logging.info('Estación cerrada.')
+    def comunica_con_estacion(self):
+        datos_ok = False
+        if self.serial != None:
+            mensaje = ''
+            envio = self.es_cambio_de_dia()
+            self.serial.write(envio)
+            time.sleep(0.6)     # Si es necesario, aumentar el timeout
+            mensaje = self.serial.read(self.serial.in_waiting).decode()
+            # Quita todo lo que no sean numeros (decimal o exponencial), comas y caracteres I y F
+            sval = ''.join(c for c in mensaje if c in 'IF0123456789.,+-e')
+            if len(sval) and sval[0]=='I' and sval[-1] == 'F':
+                sval = sval[1:-1]
+                lval = sval.split(',')
+                if len(lval) == len(Estacion.KEYS):
+                    self.sdatos = sval
+                    self.ddatos = dict(zip(Estacion.KEYS, lval))
+                    self.ciclos = float(self.ddatos['ciclos'])
+                    datos_ok = True
+            if not datos_ok:
+                logging.warning('Recibido mensaje incorrecto desde estación: %s', mensaje)
+        return datos_ok
 
-    def run_minutero(self):
-        logging.info('Temporizador minutero arrancado.')
+    def run(self):
+        logging.info('Estación arrancada.')
         minuto_ant = datetime.now().minute
         while True:
             minuto = datetime.now().minute
             es_minuto_clave = minuto != minuto_ant and minuto % self.periodo == 0
-            if self.datos_disponibles and es_minuto_clave:
-                if oled:
-                    SSPMeteoOled.update(self.ddatos)
-                self.enviar_datos_a_wunder()
-                # Control watchdog de la estación
-                if self.ddatos['uptime'] == self.uptime_ant:
-                    self.watchdog += 1
-                else:
-                    self.watchdog = 0
-                if self.watchdog > 5:
-                    logging.warning('No se reciben datos de la estación.')
-                self.uptime_ant = self.ddatos['uptime']
+            if es_minuto_clave:
+                if self.comunica_con_estacion() and self.ciclos > 0:
+                    self.salvar_datos()
+                    if oled:
+                        SSPMeteoOled.update(self.ddatos)
+                    self.enviar_datos_a_wunder()
             minuto_ant = minuto
-            time.sleep(0.5)
+            time.sleep(0.2)
 
 if __name__ == "__main__":
     import locale
