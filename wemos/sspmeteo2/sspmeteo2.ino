@@ -52,11 +52,7 @@ float humi;             // Huemdad relativa en %
 float temp;             // Temperatura en ºC
 float troc;             // Punto de rocio en ºC
 float sum_temp = 0.0;
-float min_temp = 1000.0;
-float max_temp = -1000.0;
 float sum_humi = 0.0;
-float min_humi = 1000.0;
-float max_humi = -1000.0;
 // LLUVIA
 float lluvia_dia;                             // Lluvia diaria
 float lluvia_por_hora;                        // Acumulado de lluvia en ultimo intervalo
@@ -72,7 +68,7 @@ float max_vel_vent;
 volatile unsigned long anemom_ticks = 0L;   // variables modified in callback must be volatile
 volatile unsigned long anemom_last = 0UL;   // the last time the output pin was toggled
 // VELETA
-const word veletaDir[] = {  0, 23, 45, 68, 90, 113, 135, 158, 180, 203, 225, 248, 270, 293, 315, 338};
+const word veletaDir[] = { 0, 23, 45, 68, 90, 113, 135, 158, 180, 203, 225, 248, 270, 293, 315, 338};
 const int veletaVal[] =  {752, 401, 454, 92, 101, 74, 190, 134, 286, 246, 606, 578, 895, 789, 843, 676}; // DETERMINADO EXPERIMENTALMENTE
 int veletaCount[16];    // Lleva la cuenta de las veces que se lee cada dirección
 word dir_vent;          // Direccion del viento en grados sexagesimales. (0 - 359)
@@ -117,35 +113,18 @@ void leeDHT()
         h = humi;
         t = temp;
     }
-    // Sumatorios para promedio y valores max y min
     sum_temp += t;
-    if (t < min_temp)
-        min_temp = t;
-    if (t > max_temp)
-        max_temp = t;
     sum_humi += h;
-    if (h < min_humi)
-        min_humi = h;
-    if (h > max_humi)
-        max_humi = h;
 }
 
 void calcDHT()
 {
-    // Elimina valores máximo y minimo y calcula la media
-    sum_temp -= (min_temp + max_temp);
-    temp = sum_temp / (NUM_INTERVALOS - 2);
-    sum_humi -= (min_humi + max_humi);
-    humi = sum_humi / (NUM_INTERVALOS - 2);
+    temp = sum_temp / NUM_INTERVALOS;
+    humi = sum_humi / NUM_INTERVALOS;
+    sum_temp = 0.0;
+    sum_humi = 0.0;
     // Punto de rocío
     troc = pow(humi / 100.0, 1.0 / 8.0) * (112.0 + 0.9 * temp) + 0.1 * temp - 112.0;
-    // Resetea valores de intervalo
-    sum_temp = 0.0;
-    min_temp = 1000.0;
-    max_temp = -1000.0;
-    sum_humi = 0.0;
-    min_humi = 1000.0;
-    max_humi = -1000.0;
 }
 
 // Obten la velocidad del viento como promedio en el intervalo NUM_INTERVALOS * INTERVALO_BASE
@@ -238,17 +217,17 @@ void comunica()
         reset_lluvia_dia = leido;
     String msg = String("I");
                  msg += temp;
-    msg += ", "; msg += temp2;
-    msg += ", "; msg += humi;
-    msg += ", "; msg += humi2;
-    msg += ", "; msg += troc;
-    msg += ", "; msg += pres;
-    msg += ", "; msg += lluvia_dia;
-    msg += ", "; msg += lluvia_por_hora;
-    msg += ", "; msg += vel_vent;
-    msg += ", "; msg += vel_racha;
-    msg += ", "; msg += dir_vent;
-    msg += ", "; msg += ciclos;
+    msg += ","; msg += temp2;
+    msg += ","; msg += humi;
+    msg += ","; msg += humi2;
+    msg += ","; msg += troc;
+    msg += ","; msg += pres;
+    msg += ","; msg += lluvia_dia;
+    msg += ","; msg += lluvia_por_hora;
+    msg += ","; msg += vel_vent;
+    msg += ","; msg += vel_racha;
+    msg += ","; msg += dir_vent;
+    msg += ","; msg += ciclos;
     msg += "F";
     Serial.print(msg);
 }
@@ -280,8 +259,8 @@ void loop()
             leeBME();
             calcVeleta();
             calcDHT();
-            intervalo = 0;
             ciclos ++;
+            intervalo = 0;
         }
         timer_lectura += INTERVALO_BASE;
     }
