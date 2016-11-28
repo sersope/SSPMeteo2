@@ -27,7 +27,7 @@ import os
 import requests
 import time
 import serial
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 oled = True
@@ -38,7 +38,7 @@ except:
 
 class Estacion:
 
-    KEYS = ['temp', 'temp2', 'humi', 'humi2', 'troc', 'pres', 'llud', 'lluh', 'vven', 'vrac', 'dven', 'ciclos']
+    KEYS = ['hora', 'temp', 'temp2', 'humi', 'humi2', 'troc', 'pres', 'llud', 'lluh', 'vven', 'vrac', 'dven', 'ciclos']
 
     def __init__(self, port= '/dev/ttyUSB0', periodo= 5):
         self.port = port
@@ -47,9 +47,7 @@ class Estacion:
         self.ciclos = 0.0               # Uptime estacion = ciclos * periodo (en minutos)
         self.serial = None
         # Inicializacion de datos
-        lceros = ['0' for k in Estacion.KEYS]
-        self.sdatos = ','.join(lceros)
-        self.ddatos = dict(zip(Estacion.KEYS, lceros))
+        self.ddatos = dict(zip(Estacion.KEYS, ['0' for k in Estacion.KEYS]))
         # Pantalla Oled
         if oled:
             SSPMeteoOled.begin()
@@ -63,8 +61,7 @@ class Estacion:
             self.serial = None
 
     def es_cambio_de_dia(self):
-        # TODO: Revisar esto
-        dema = datetime.now().day
+        dema = (datetime.now() + timedelta(minutes= self.periodo)).day
         if dema != self.hoy:
             respuesta = b'Y'
         else:
@@ -80,7 +77,10 @@ class Estacion:
             os.makedirs(data_dir)
         fname = data_dir + ahora.strftime('%Y-%m-%d.dat')
         with open(fname, 'a') as f:
-           f.write(ahora.strftime('%c,') + self.sdatos + '\n')
+           f.write(','.join([self.ddatos[k] for k in Estacion.KEYS]))
+        #Salva la lluvia diaria
+        with open('datos/lluvia.last','w') as f:
+            f.write(self.ddatos['llud'])
 
     def enviar_datos_a_wunder(self):
         url = 'https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php'
@@ -120,11 +120,10 @@ class Estacion:
             # Quita todo lo que no sean numeros (decimal o exponencial), comas y caracteres I y F
             sval = ''.join(c for c in mensaje if c in 'IF0123456789.,+-e')
             if len(sval) and sval[0]=='I' and sval[-1] == 'F':
-                sval = sval[1:-1]
-                lval = sval.split(',')
-                if len(lval) == len(Estacion.KEYS):
-                    self.sdatos = sval
-                    self.ddatos = dict(zip(Estacion.KEYS, lval))
+                lval = sval[1:-1].split(',')
+                if len(lval) == len(Estacion.KEYS) - 1:
+                    self.ddatos = dict(zip(Estacion.KEYS[1:], lval))
+                    self.ddatos['hora'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     self.ciclos = float(self.ddatos['ciclos'])
                     datos_ok = True
             if not datos_ok:

@@ -28,7 +28,6 @@ import locale
 import logging
 from bottle import route, run, template, static_file
 import threading
-from datetime import datetime
 from sspmeteo2_estacion import Estacion
 
 # Rutas del servidor
@@ -42,7 +41,7 @@ def principal():
     d, resto = divmod(int(estacion.ciclos) * estacion.periodo, 24 * 60)
     h, m = divmod(resto, 60)
     uptime = ' Actividad: {}d {}h {}m'.format(int(d), int(h), int(m))
-    status = 'Datos actualizados a las ' + datetime.now().strftime('%H:%M:%S') + uptime
+    status = 'Actualización: ' + estacion.ddatos['hora'] + uptime
     return template('sspmeteo2', datos=estacion.ddatos, status=status)
 
 @route('/sspmeteo2/<year>/<mes>/<dia>')
