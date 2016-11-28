@@ -77,7 +77,7 @@ class Estacion:
             os.makedirs(data_dir)
         fname = data_dir + ahora.strftime('%Y-%m-%d.dat')
         with open(fname, 'a') as f:
-           f.write(','.join([self.ddatos[k] for k in Estacion.KEYS]))
+           f.write(','.join([self.ddatos[k] for k in Estacion.KEYS]) + '\n')
         #Salva la lluvia diaria
         with open('datos/lluvia.last','w') as f:
             f.write(self.ddatos['llud'])
