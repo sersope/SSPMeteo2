@@ -81,32 +81,33 @@ class Estacion:
         #Salva la lluvia diaria
         with open('datos/lluvia.last','w') as f:
             f.write(self.ddatos['llud'])
+        print(ahora, self.ciclos)
 
     def enviar_datos_a_wunder(self):
         url = 'https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php'
-        try:
-            params = {  'action':       'updateraw',
-                        'ID':           'ICOMUNID54',
-                        'PASSWORD':     'laura11',
-                        'dateutc':      'now',
-                        'tempf':        str(float(self.ddatos['temp']) * 1.8 + 32),
-                        'humidity':     str(self.ddatos['humi']),
-                        'dewptf':       str(float(self.ddatos['troc']) * 1.8 + 32),
-                        'baromin':      str(float(self.ddatos['pres']) * 0.0295299830714),
-                        'dailyrainin':  str(float(self.ddatos['llud']) / 25.4),
-                        'rainin':       str(float(self.ddatos['lluh']) / 25.4),
-                        'windspeedmph': str(float(self.ddatos['vven']) * 0.621371192),
-                        'windgustmph':  str(float(self.ddatos['vrac']) * 0.621371192),
-                        'winddir':      str(self.ddatos['dven']) }
-            logging.disable(logging.INFO)
-            respuesta = requests.get(url, params = params)
-            logging.disable(logging.NOTSET)
-            if 'success' not in respuesta.text:
-                logging.warning('Datos no recibidos en Wunder.')
-                return False
-        except:
-            logging.exception('Excepción: Error en envío a Wunder.')
+        #try:
+        params = {  'action':       'updateraw',
+                    'ID':           'ICOMUNID54',
+                    'PASSWORD':     'laura11',
+                    'dateutc':      'now',
+                    'tempf':        str(float(self.ddatos['temp']) * 1.8 + 32),
+                    'humidity':     str(self.ddatos['humi']),
+                    'dewptf':       str(float(self.ddatos['troc']) * 1.8 + 32),
+                    'baromin':      str(float(self.ddatos['pres']) * 0.0295299830714),
+                    'dailyrainin':  str(float(self.ddatos['llud']) / 25.4),
+                    'rainin':       str(float(self.ddatos['lluh']) / 25.4),
+                    'windspeedmph': str(float(self.ddatos['vven']) * 0.621371192),
+                    'windgustmph':  str(float(self.ddatos['vrac']) * 0.621371192),
+                    'winddir':      str(self.ddatos['dven']) }
+        #logging.disable(logging.INFO)
+        respuesta = requests.get(url, params = params)
+        #logging.disable(logging.NOTSET)
+        if 'success' not in respuesta.text:
+            logging.warning('Datos no recibidos en Wunder.')
             return False
+        #except:
+        #    logging.exception('Excepción: Error en envío a Wunder.')
+        #    return False
         return True
 
     def comunica_con_estacion(self):
@@ -137,11 +138,11 @@ class Estacion:
             minuto = datetime.now().minute
             es_minuto_clave = minuto != minuto_ant and minuto % self.periodo == 0
             if es_minuto_clave:
-                if self.comunica_con_estacion() and self.ciclos > 0:
-                    self.salvar_datos()
-                    if oled:
-                        SSPMeteoOled.update(self.ddatos)
-                    self.enviar_datos_a_wunder()
+                self.comunica_con_estacion()
+                self.salvar_datos()
+                if oled:
+                    SSPMeteoOled.update(self.ddatos)
+                self.enviar_datos_a_wunder()
             minuto_ant = minuto
             time.sleep(0.2)
 
